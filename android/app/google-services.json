@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "407244257726",
+    "project_id": "assistudla",
+    "storage_bucket": "assistudla.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:407244257726:android:bb5108a8c60e1ee79e61ef",
+        "android_client_info": {
+          "package_name": "com.example.ceiba"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLjitmOoZpmK9LBVURinOjqJBGUqvNjvc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
