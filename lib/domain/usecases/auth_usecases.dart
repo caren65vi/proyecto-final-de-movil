@@ -53,6 +53,18 @@ class ObtenerUsuarioActual {
   Future<Usuario?> call() => repositorio.obtenerUsuarioActual();
 }
 
+class RecuperarContrasena {
+  final AuthRepository repositorio;
+  RecuperarContrasena(this.repositorio);
+
+  Future<void> call(String correo) async {
+    if (correo.trim().isEmpty) {
+      throw const AuthError('Escribe tu correo');
+    }
+    return repositorio.recuperarContrasena(correo.trim());
+  }
+}
+
 class CerrarSesion {
   final AuthRepository repositorio;
   CerrarSesion(this.repositorio);

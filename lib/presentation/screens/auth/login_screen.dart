@@ -1,9 +1,23 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
+import '../../../domain/repositories/auth_repository.dart';
+import '../../../domain/usecases/auth_usecases.dart';
+import '../../theme/app_colors.dart';
+import 'recover_password_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({
+    super.key,
+    required this.iniciarSesion,
+    required this.registrarUsuario,
+    required this.recuperarContrasena,
+  });
+
+  // Caso de uso que valida el correo y la contraseña en Firebase
+  final IniciarSesion iniciarSesion;
+  final RegistrarUsuario registrarUsuario;
+  final RecuperarContrasena recuperarContrasena;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -16,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -24,30 +39,59 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
+  Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Más adelante aquí conectaremos Firebase Authentication.
+    setState(() => _loading = true);
+    try {
+      final usuario = await widget.iniciarSesion(
+        _emailController.text,
+        _passwordController.text,
+      );
+      if (!mounted) return;
+
+      // En el Paso 11 aquí se navegará al inicio del docente o del estudiante.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Bienvenido, ${usuario.nombre} (${usuario.rol})'),
+        ),
+      );
+    } on AuthError catch (e) {
+      _showError(e.mensaje);
+    } catch (_) {
+      _showError('Ocurrió un error inesperado. Intenta de nuevo.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Formulario correcto. Firebase se conectará después.'),
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
     );
   }
 
   void _forgotPassword() {
-    // Más adelante navegaremos a recuperación de contraseña.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Recuperación de contraseña pendiente.')),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RecoverPasswordScreen(
+          recuperarContrasena: widget.recuperarContrasena,
+          // Si ya escribió su correo en el login, se reutiliza
+          correoInicial: _emailController.text.trim(),
+        ),
+      ),
     );
   }
 
   void _createAccount() {
-    // Cuando creemos RegisterScreen cambiaremos esto por Navigator.push().
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Pantalla de registro pendiente.')),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            RegisterScreen(registrarUsuario: widget.registrarUsuario),
+      ),
     );
   }
 
@@ -76,19 +120,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withOpacity(0.08),
+                            color: AppColors.primary.withValues(alpha: 0.08),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
                         ],
                       ),
                       child: ClipRRect(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.asset(
-                            '../../../../../assets/images/ceiba_logo.png',
-                            fit: BoxFit.contain,
-                          ),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.asset(
+                          'assets/images/ceiba_logo.png',
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),
@@ -191,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.06),
+                      color: AppColors.primary.withValues(alpha: 0.06),
                       blurRadius: 5,
                       offset: const Offset(0, 2),
                     ),
@@ -293,15 +335,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       SizedBox(
                         height: 52,
                         child: FilledButton(
-                          onPressed: _login,
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Iniciar sesión'),
-                              SizedBox(width: 8),
-                              Icon(Icons.arrow_forward_rounded, size: 20),
-                            ],
-                          ),
+                          // Deshabilitado mientras espera la respuesta de Firebase
+                          onPressed: _loading ? null : _login,
+                          child: _loading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text('Iniciar sesión'),
+                                    SizedBox(width: 8),
+                                    Icon(Icons.arrow_forward_rounded, size: 20),
+                                  ],
+                                ),
                         ),
                       ),
                     ],

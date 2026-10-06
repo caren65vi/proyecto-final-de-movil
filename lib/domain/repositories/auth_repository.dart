@@ -20,6 +20,8 @@ abstract class AuthRepository {
 
   Future<Usuario> iniciarSesion(String correo, String contrasena);
 
+  Future<void> recuperarContrasena(String correo);
+
   Future<Usuario?> obtenerUsuarioActual();
 
   Future<void> cerrarSesion();

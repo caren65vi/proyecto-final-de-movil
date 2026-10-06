@@ -17,12 +17,14 @@ class AuthRepositoryImpl implements AuthRepository {
     required String contrasena,
     required String rol,
   }) {
-    return _traducirErrores(() => datasource.registrar(
-          nombre: nombre,
-          correo: correo,
-          contrasena: contrasena,
-          rol: rol,
-        ));
+    return _traducirErrores(
+      () => datasource.registrar(
+        nombre: nombre,
+        correo: correo,
+        contrasena: contrasena,
+        rol: rol,
+      ),
+    );
   }
 
   @override
@@ -32,7 +34,9 @@ class AuthRepositoryImpl implements AuthRepository {
       if (usuario == null) {
         // Tiene cuenta en Authentication pero el docente lo eliminó de Firestore
         await datasource.cerrarSesion();
-        throw const AuthError('Esta cuenta ya no está registrada en el sistema');
+        throw const AuthError(
+          'Esta cuenta ya no está registrada en el sistema',
+        );
       }
       return usuario;
     });
@@ -60,6 +64,11 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  @override
+  Future<void> recuperarContrasena(String correo) {
+    return _traducirErrores(() => datasource.enviarCorreoRecuperacion(correo));
+  }
+
   String _mensaje(String codigo) {
     switch (codigo) {
       case 'invalid-credential':
@@ -67,6 +76,7 @@ class AuthRepositoryImpl implements AuthRepository {
       case 'user-not-found':
         return 'Correo o contraseña incorrectos';
       case 'invalid-email':
+      case 'missing-email':
         return 'El correo no es válido';
       case 'email-already-in-use':
         return 'Ese correo ya está registrado';
