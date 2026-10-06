@@ -57,5 +57,11 @@ class AuthDatasource {
     return UsuarioModel.fromFirestore(doc);
   }
 
+//firebase envia un correo de recuperación de contraseña al correo del usuario
+  Future<void> enviarCorreoRecuperacion(String correo) async {
+    await _auth.setLanguageCode('es'); // el correo llega en español
+    await _auth.sendPasswordResetEmail(email: correo);
+  }
+
   Future<void> cerrarSesion() => _auth.signOut();
 }

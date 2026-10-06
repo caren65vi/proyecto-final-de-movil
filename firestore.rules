@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// Reglas publicadas en la consola de Firebase (proyecto assistudla).
+// Roles: docente y estudiante; cada usuario elige su rol al registrarse.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Rol del usuario que hace la petición, leído de su documento
+    function rolActual() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol;
+    }
+
+    match /usuarios/{uid} {
+
+      // Registro: cada usuario crea solo su documento, con un rol válido
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.rol in ['docente', 'estudiante'];
+
+      // Cada usuario lee su documento; el docente lee todos
+      allow read: if request.auth != null
+                  && (request.auth.uid == uid || rolActual() == 'docente');
+
+      // Solo el docente edita o elimina, y solo a estudiantes
+      allow update, delete: if request.auth != null
+                            && rolActual() == 'docente'
+                            && resource.data.rol == 'estudiante';
+    }
+  }
+}
