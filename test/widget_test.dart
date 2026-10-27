@@ -37,6 +37,12 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> recuperarContrasena(String correo) async {}
 
   @override
+  Future<void> enviarCorreoVerificacion() async {}
+
+  @override
+  Future<bool> correoVerificado() async => true;
+
+  @override
   Future<void> cerrarSesion() async {}
 }
 
@@ -48,6 +54,9 @@ Future<void> abrirLogin(WidgetTester tester) {
         iniciarSesion: IniciarSesion(repository),
         registrarUsuario: RegistrarUsuario(repository),
         recuperarContrasena: RecuperarContrasena(repository),
+        enviarCorreoVerificacion: EnviarCorreoVerificacion(repository),
+        comprobarCorreoVerificado: ComprobarCorreoVerificado(repository),
+        cerrarSesion: CerrarSesion(repository),
       ),
     ),
   );
@@ -91,6 +100,8 @@ void main() {
     await tester.tap(find.text('Iniciar sesión').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Bienvenido, Caren (docente)'), findsOneWidget);
+    // Tras el login se abre el portal con el saludo según el rol
+    expect(find.text('Bienvenido docente'), findsOneWidget);
+    expect(find.text('Caren'), findsOneWidget);
   });
 }

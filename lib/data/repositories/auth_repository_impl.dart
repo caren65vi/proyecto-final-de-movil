@@ -38,6 +38,9 @@ class AuthRepositoryImpl implements AuthRepository {
           'Esta cuenta ya no está registrada en el sistema',
         );
       }
+      if (!await datasource.correoVerificado()) {
+        throw const CorreoNoVerificadoError();
+      }
       return usuario;
     });
   }
@@ -67,6 +70,16 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> recuperarContrasena(String correo) {
     return _traducirErrores(() => datasource.enviarCorreoRecuperacion(correo));
+  }
+
+  @override
+  Future<void> enviarCorreoVerificacion() {
+    return _traducirErrores(datasource.enviarCorreoVerificacion);
+  }
+
+  @override
+  Future<bool> correoVerificado() {
+    return _traducirErrores(datasource.correoVerificado);
   }
 
   String _mensaje(String codigo) {
