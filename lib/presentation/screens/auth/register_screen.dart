@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../theme/app_colors.dart';
+import 'verify_code_screen.dart';
 
 enum UserRole { student, teacher }
 
@@ -99,7 +100,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  Future<void> _continueRegistration() async {
+  void _continueRegistration() {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -112,43 +113,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       );
-
       return;
     }
 
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _loading = true);
-    try {
-      await widget.registrarUsuario(
-        nombre: _nameController.text,
-        correo: _emailController.text,
-        contrasena: _passwordController.text,
-        rol: _selectedRole == UserRole.student ? 'estudiante' : 'docente',
-      );
-      if (!mounted) return;
+    final email = _emailController.text.trim();
 
-      Navigator.of(context).pop();
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Cuenta creada correctamente. Ya puedes iniciar sesión.'),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VerifyCodeScreen(
+          email: email,
+          purpose: VerifyCodePurpose.registration,
         ),
-      );
-    } on AuthError catch (e) {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text(e.mensaje), backgroundColor: AppColors.error),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo crear la cuenta. Intenta de nuevo.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+      ),
+    );
   }
 
   @override

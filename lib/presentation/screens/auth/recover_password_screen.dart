@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../theme/app_colors.dart';
+import 'reset_password_screen.dart';
+import 'verify_code_screen.dart';
 
 class RecoverPasswordScreen extends StatefulWidget {
   const RecoverPasswordScreen({
@@ -387,25 +389,27 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                 shape: const StadiumBorder(),
                 elevation: 2,
               ),
-              // Deshabilitado mientras espera la respuesta de Firebase
-              onPressed: _loading ? null : _enviar,
-              child: _loading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Enviar enlace de recuperación'),
-                        SizedBox(width: 8),
-                        Icon(Icons.send_rounded, size: 18),
-                      ],
+              onPressed: () {
+                final email = _emailController.text.trim();
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VerifyCodeScreen(
+                      email: email,
+                      purpose: VerifyCodePurpose.passwordRecovery,
                     ),
+                  ),
+                );
+              },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Enviar código de recuperación'),
+                  SizedBox(width: 8),
+                  Icon(Icons.send_rounded, size: 18),
+                ],
+              ),
             ),
           ),
         ],
