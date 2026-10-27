@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../theme/app_colors.dart';
+import '../portal.dart';
 import 'recover_password_screen.dart';
 import 'register_screen.dart';
 
@@ -52,11 +53,9 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (!mounted) return;
 
-      // En el Paso 11 aquí se navegará al inicio del docente o del estudiante.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Bienvenido, ${usuario.nombre} (${usuario.rol})'),
-        ),
+      // Reemplaza el login por el portal para no volver atrás con el botón de regreso
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => PortalScreen(usuario: usuario)),
       );
     } on AuthError catch (e) {
       _showError(e.mensaje);
