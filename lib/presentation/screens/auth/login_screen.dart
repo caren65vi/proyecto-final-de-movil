@@ -4,6 +4,7 @@ import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../theme/app_colors.dart';
 import '../Docente/home_docente.dart';
+import '../Estudiante/home_estudiante.dart';
 import 'recover_password_screen.dart';
 import 'register_screen.dart';
 import 'verify_email_screen.dart';
@@ -60,22 +61,20 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (!mounted) return;
 
-      if (!usuario.esDocente) {
-        // TODO: abrir la pantalla de inicio del estudiante cuando exista
-        await widget.cerrarSesion();
-        _showError('La sección de estudiantes aún no está disponible.');
-        return;
-      }
-
       // El login queda debajo para volver a él al cerrar sesión;
-      // el inicio del docente bloquea el botón atrás
+      // cada inicio controla el botón atrás
       _passwordController.clear();
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => HomeDocenteScreen(
-            usuario: usuario,
-            cerrarSesion: widget.cerrarSesion,
-          ),
+          builder: (_) => usuario.esDocente
+              ? HomeDocenteScreen(
+                  usuario: usuario,
+                  cerrarSesion: widget.cerrarSesion,
+                )
+              : HomeEstudianteScreen(
+                  usuario: usuario,
+                  cerrarSesion: widget.cerrarSesion,
+                ),
         ),
       );
     } on CorreoNoVerificadoError catch (e) {
