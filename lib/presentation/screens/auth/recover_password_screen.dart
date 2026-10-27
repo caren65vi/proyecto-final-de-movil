@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../theme/app_colors.dart';
-import 'reset_password_screen.dart';
-import 'verify_code_screen.dart';
 
 class RecoverPasswordScreen extends StatefulWidget {
   const RecoverPasswordScreen({
@@ -60,6 +58,24 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
       _showError(e.mensaje);
     } catch (_) {
       _showError('Ocurrió un error inesperado. Intenta de nuevo.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  // Vuelve a pedir a Firebase el correo de recuperación al mismo correo
+  Future<void> _reenviar() async {
+    setState(() => _loading = true);
+    try {
+      await widget.recuperarContrasena(_correoEnviado!);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Te enviamos un nuevo enlace a $_correoEnviado.')),
+      );
+    } on AuthError catch (e) {
+      _showError(e.mensaje);
+    } catch (_) {
+      _showError('No se pudo reenviar el correo. Intenta de nuevo.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -241,7 +257,11 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                               ? _buildForm()
                               : _SuccessPanel(
                                   correo: _correoEnviado!,
+                                  reenviando: _loading,
+                                  onReenviar: _reenviar,
                                   onProbarOtro: _probarOtroCorreo,
+                                  onVolverAlLogin: () =>
+                                      Navigator.of(context).pop(),
                                 ),
                         ),
                       ),
@@ -389,27 +409,25 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                 shape: const StadiumBorder(),
                 elevation: 2,
               ),
-              onPressed: () {
-                final email = _emailController.text.trim();
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => VerifyCodeScreen(
-                      email: email,
-                      purpose: VerifyCodePurpose.passwordRecovery,
+              // Deshabilitado mientras espera la respuesta de Firebase
+              onPressed: _loading ? null : _enviar,
+              child: _loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Enviar enlace de recuperación'),
+                        SizedBox(width: 8),
+                        Icon(Icons.send_rounded, size: 18),
+                      ],
                     ),
-                  ),
-                );
-              },
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Enviar código de recuperación'),
-                  SizedBox(width: 8),
-                  Icon(Icons.send_rounded, size: 18),
-                ],
-              ),
             ),
           ),
         ],
@@ -421,9 +439,18 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
 /// Confirmación que reemplaza al formulario cuando Firebase envía el correo.
 class _SuccessPanel extends StatelessWidget {
   final String correo;
+  final bool reenviando;
+  final VoidCallback onReenviar;
   final VoidCallback onProbarOtro;
+  final VoidCallback onVolverAlLogin;
 
-  const _SuccessPanel({required this.correo, required this.onProbarOtro});
+  const _SuccessPanel({
+    required this.correo,
+    required this.reenviando,
+    required this.onReenviar,
+    required this.onProbarOtro,
+    required this.onVolverAlLogin,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -484,17 +511,118 @@ class _SuccessPanel extends StatelessWidget {
 
         const SizedBox(height: 16),
 
-        TextButton(
-          onPressed: onProbarOtro,
-          style: TextButton.styleFrom(
-            backgroundColor: AppColors.surfaceContainer,
-            foregroundColor: AppColors.primary,
-            shape: const StadiumBorder(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+        // Qué hacer con el correo
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLow,
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: const Text(
-            'Probar con otro correo',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Paso(numero: 1, texto: 'Abre el correo y pulsa el enlace.'),
+              SizedBox(height: 8),
+              _Paso(numero: 2, texto: 'Escribe tu nueva contraseña en la página que se abre.'),
+              SizedBox(height: 8),
+              _Paso(numero: 3, texto: 'Vuelve a Ceiba e inicia sesión con ella.'),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              shape: const StadiumBorder(),
+              elevation: 2,
+            ),
+            onPressed: onVolverAlLogin,
+            child: const Text('Volver a iniciar sesión'),
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            TextButton(
+              // Deshabilitado mientras espera la respuesta de Firebase
+              onPressed: reenviando ? null : onReenviar,
+              style: TextButton.styleFrom(
+                backgroundColor: AppColors.surfaceContainer,
+                foregroundColor: AppColors.primary,
+                shape: const StadiumBorder(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: Text(
+                reenviando ? 'Enviando…' : 'Reenviar enlace',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+            TextButton(
+              onPressed: onProbarOtro,
+              style: TextButton.styleFrom(
+                backgroundColor: AppColors.surfaceContainer,
+                foregroundColor: AppColors.primary,
+                shape: const StadiumBorder(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: const Text(
+                'Probar con otro correo',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _Paso extends StatelessWidget {
+  final int numero;
+  final String texto;
+
+  const _Paso({required this.numero, required this.texto});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 20,
+          height: 20,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: AppColors.primary,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '$numero',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            texto,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              height: 1.4,
+            ),
           ),
         ),
       ],

@@ -37,13 +37,30 @@ class RegistrarUsuario {
     if (rol != 'docente' && rol != 'estudiante') {
       throw const AuthError('Selecciona si eres docente o estudiante');
     }
-    return repositorio.registrar(
+    final usuario = await repositorio.registrar(
       nombre: nombre.trim(),
       correo: correo.trim(),
       contrasena: contrasena,
       rol: rol,
     );
+    // La cuenta queda creada pero no podrá entrar hasta abrir este enlace
+    await repositorio.enviarCorreoVerificacion();
+    return usuario;
   }
+}
+
+class EnviarCorreoVerificacion {
+  final AuthRepository repositorio;
+  EnviarCorreoVerificacion(this.repositorio);
+
+  Future<void> call() => repositorio.enviarCorreoVerificacion();
+}
+
+class ComprobarCorreoVerificado {
+  final AuthRepository repositorio;
+  ComprobarCorreoVerificado(this.repositorio);
+
+  Future<bool> call() => repositorio.correoVerificado();
 }
 
 class ObtenerUsuarioActual {

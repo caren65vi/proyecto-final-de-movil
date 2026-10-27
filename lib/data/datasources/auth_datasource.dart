@@ -63,5 +63,19 @@ class AuthDatasource {
     await _auth.sendPasswordResetEmail(email: correo);
   }
 
+  // Firebase envía un enlace de verificación al correo del usuario con sesión abierta
+  Future<void> enviarCorreoVerificacion() async {
+    await _auth.setLanguageCode('es'); // el correo llega en español
+    await _auth.currentUser!.sendEmailVerification();
+  }
+
+  // Recarga el usuario desde Firebase para saber si ya abrió el enlace
+  Future<bool> correoVerificado() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    return _auth.currentUser!.emailVerified;
+  }
+
   Future<void> cerrarSesion() => _auth.signOut();
 }

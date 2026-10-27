@@ -3,14 +3,23 @@ import 'package:flutter/material.dart';
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../theme/app_colors.dart';
-import 'verify_code_screen.dart';
+import 'verify_email_screen.dart';
 
 enum UserRole { student, teacher }
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key, required this.registrarUsuario});
+  const RegisterScreen({
+    super.key,
+    required this.registrarUsuario,
+    required this.enviarCorreoVerificacion,
+    required this.comprobarCorreoVerificado,
+    required this.cerrarSesion,
+  });
 
   final RegistrarUsuario registrarUsuario;
+  final EnviarCorreoVerificacion enviarCorreoVerificacion;
+  final ComprobarCorreoVerificado comprobarCorreoVerificado;
+  final CerrarSesion cerrarSesion;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -100,7 +109,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _continueRegistration() {
+  Future<void> _continueRegistration() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -116,16 +125,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    final email = _emailController.text.trim();
+    setState(() => _loading = true);
+    try {
+      // Crea la cuenta en Firebase y envía el enlace de verificación
+      await widget.registrarUsuario(
+        nombre: _nameController.text,
+        correo: _emailController.text,
+        contrasena: _passwordController.text,
+        rol: _selectedRole == UserRole.student ? 'estudiante' : 'docente',
+      );
+      if (!mounted) return;
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => VerifyCodeScreen(
-          email: email,
-          purpose: VerifyCodePurpose.registration,
+      // Reemplaza el registro: la cuenta ya existe y no debe volver al formulario
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => VerifyEmailScreen(
+            email: _emailController.text.trim(),
+            enviarCorreoVerificacion: widget.enviarCorreoVerificacion,
+            comprobarCorreoVerificado: widget.comprobarCorreoVerificado,
+            cerrarSesion: widget.cerrarSesion,
+          ),
         ),
-      ),
+      );
+    } on AuthError catch (e) {
+      _showError(e.mensaje);
+    } catch (_) {
+      _showError('No se pudo crear la cuenta. Intenta de nuevo.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
     );
   }
 
@@ -613,6 +648,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 SizedBox(
                   height: 48,
                   child: FilledButton(
+                    // Deshabilitado mientras espera la respuesta de Firebase
                     onPressed: _loading ? null : _continueRegistration,
                     child: _loading
                         ? const SizedBox(

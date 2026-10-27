@@ -6,6 +6,7 @@ import '../../theme/app_colors.dart';
 import '../portal.dart';
 import 'recover_password_screen.dart';
 import 'register_screen.dart';
+import 'verify_email_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -13,12 +14,18 @@ class LoginScreen extends StatefulWidget {
     required this.iniciarSesion,
     required this.registrarUsuario,
     required this.recuperarContrasena,
+    required this.enviarCorreoVerificacion,
+    required this.comprobarCorreoVerificado,
+    required this.cerrarSesion,
   });
 
   // Caso de uso que valida el correo y la contraseña en Firebase
   final IniciarSesion iniciarSesion;
   final RegistrarUsuario registrarUsuario;
   final RecuperarContrasena recuperarContrasena;
+  final EnviarCorreoVerificacion enviarCorreoVerificacion;
+  final ComprobarCorreoVerificado comprobarCorreoVerificado;
+  final CerrarSesion cerrarSesion;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -57,6 +64,10 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => PortalScreen(usuario: usuario)),
       );
+    } on CorreoNoVerificadoError catch (e) {
+      // La contraseña es correcta pero falta abrir el enlace del correo
+      _showError(e.mensaje);
+      _abrirVerificacion();
     } on AuthError catch (e) {
       _showError(e.mensaje);
     } catch (_) {
@@ -85,11 +96,28 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _abrirVerificacion() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VerifyEmailScreen(
+          email: _emailController.text.trim(),
+          enviarCorreoVerificacion: widget.enviarCorreoVerificacion,
+          comprobarCorreoVerificado: widget.comprobarCorreoVerificado,
+          cerrarSesion: widget.cerrarSesion,
+        ),
+      ),
+    );
+  }
+
   void _createAccount() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            RegisterScreen(registrarUsuario: widget.registrarUsuario),
+        builder: (_) => RegisterScreen(
+          registrarUsuario: widget.registrarUsuario,
+          enviarCorreoVerificacion: widget.enviarCorreoVerificacion,
+          comprobarCorreoVerificado: widget.comprobarCorreoVerificado,
+          cerrarSesion: widget.cerrarSesion,
+        ),
       ),
     );
   }

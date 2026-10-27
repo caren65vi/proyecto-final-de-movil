@@ -30,6 +30,9 @@ class CeibaApp extends StatelessWidget {
         iniciarSesion: IniciarSesion(authRepository),
         registrarUsuario: RegistrarUsuario(authRepository),
         recuperarContrasena: RecuperarContrasena(authRepository),
+        enviarCorreoVerificacion: EnviarCorreoVerificacion(authRepository),
+        comprobarCorreoVerificado: ComprobarCorreoVerificado(authRepository),
+        cerrarSesion: CerrarSesion(authRepository),
       ),
     );
   }
