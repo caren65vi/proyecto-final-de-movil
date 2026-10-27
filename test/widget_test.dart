@@ -100,8 +100,7 @@ void main() {
     await tester.tap(find.text('Iniciar sesión').last);
     await tester.pumpAndSettle();
 
-    // Tras el login se abre el portal con el saludo según el rol
-    expect(find.text('Bienvenido docente'), findsOneWidget);
-    expect(find.text('Caren'), findsOneWidget);
+    // Tras el login el docente llega a su pantalla de inicio
+    expect(find.text('Hola, Prof. Caren'), findsOneWidget);
   });
 }
