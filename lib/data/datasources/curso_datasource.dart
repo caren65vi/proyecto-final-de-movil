@@ -12,6 +12,18 @@ class CursoDatasource {
   CollectionReference<Map<String, dynamic>> get _grupos =>
       _db.collection('grupos');
 
+  // Cursos cuyo dueño es el docente (las reglas solo permiten esta consulta)
+  Stream<List<Curso>> misCursos(String docenteUid) {
+    return _grupos
+        .where('docenteUid', isEqualTo: docenteUid)
+        .snapshots()
+        .map(
+          (snap) => [
+            for (final doc in snap.docs) CursoModel.fromFirestore(doc),
+          ],
+        );
+  }
+
   // Guarda el curso y luego su lista de estudiantes
   Future<String> crearCurso(
     Curso curso,

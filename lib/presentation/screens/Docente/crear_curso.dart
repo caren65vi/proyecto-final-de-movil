@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+// Solo LatLng: latlong2 también define un Path que choca con el de Flutter
+import 'package:latlong2/latlong.dart' show LatLng;
 
 import '../../../domain/entities/bloque_horario.dart';
 import '../../../domain/entities/curso.dart';
@@ -86,6 +89,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
   double? _latitud;
   double? _longitud;
   bool _buscandoUbicacion = false;
+  final _mapController = MapController();
 
   // Lista de estudiantes importada del archivo (opcional)
   List<EstudianteInscrito> _estudiantes = [];
@@ -104,6 +108,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
   void dispose() {
     _nombreController.dispose();
     _salonController.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -187,12 +192,21 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
     try {
       final ubicacion = await _obtenerMiUbicacion();
       if (!mounted) return;
+      // Si el mapa ya estaba visible hay que moverlo; si no, nace centrado
+      final mapaVisible = _latitud != null;
       setState(() {
         _latitud = ubicacion.latitud;
         _longitud = ubicacion.longitud;
       });
+      if (mapaVisible) {
+        _mapController.move(LatLng(ubicacion.latitud, ubicacion.longitud), 17);
+      }
     } on CursoError catch (e) {
       if (mounted) _mostrarError(e.mensaje);
+    } catch (_) {
+      if (mounted) {
+        _mostrarError('No se pudo obtener la ubicación. Intenta de nuevo.');
+      }
     } finally {
       if (mounted) setState(() => _buscandoUbicacion = false);
     }
@@ -698,6 +712,97 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
 
   // ---------- Ubicación ----------
 
+  // Antes de fijar la ubicación: fondo de puntos con un pin
+  Widget _buildMapaVacio() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Positioned.fill(child: CustomPaint(painter: _PuntosPainter())),
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            color: AppColors.primaryDark.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.primaryDark.withValues(alpha: 0.3),
+            ),
+          ),
+        ),
+        const _PinUbicacion(),
+      ],
+    );
+  }
+
+  // Mapa de OpenStreetMap con el punto del curso y el radio a escala
+  Widget _buildMapa() {
+    final centro = LatLng(_latitud!, _longitud!);
+
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: centro,
+        initialZoom: 17,
+        minZoom: 3,
+        maxZoom: 19,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        ),
+        // Tocar el mapa mueve el punto (ej. si el docente no está en el salón)
+        onTap: (_, punto) => setState(() {
+          _latitud = punto.latitude;
+          _longitud = punto.longitude;
+        }),
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          // OpenStreetMap pide identificar la app que descarga los mapas
+          userAgentPackageName: 'com.example.ceiba',
+        ),
+        CircleLayer(
+          circles: [
+            CircleMarker(
+              point: centro,
+              radius: _radio,
+              useRadiusInMeter: true,
+              color: AppColors.primaryDark.withValues(alpha: 0.15),
+              borderColor: AppColors.primaryDark.withValues(alpha: 0.6),
+              borderStrokeWidth: 2,
+            ),
+          ],
+        ),
+        MarkerLayer(
+          markers: [
+            Marker(
+              point: centro,
+              width: 36,
+              height: 36,
+              child: const _PinUbicacion(),
+            ),
+          ],
+        ),
+        // Crédito obligatorio de OpenStreetMap, pequeño para no tapar el mapa
+        const Align(
+          alignment: Alignment.bottomRight,
+          child: Padding(
+            padding: EdgeInsets.all(4),
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: Color(0xCCFFFFFF)),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                child: Text(
+                  '© OpenStreetMap',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 9),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildUbicacion() {
     final radioTexto = '${_radio.round()} m';
 
@@ -710,9 +815,9 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
         color: AppColors.outline,
       ),
       children: [
-        // Vista del mapa (decorativa hasta conectar la ubicación real)
+        // Mapa: aparece al fijar la ubicación; tocarlo mueve el punto del curso
         Container(
-          height: 144,
+          height: 220,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: AppColors.surfaceLow,
@@ -724,40 +829,12 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              Positioned.fill(child: CustomPaint(painter: _PuntosPainter())),
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryDark.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.primaryDark.withValues(alpha: 0.3),
-                  ),
-                ),
-              ),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryDark,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryDark.withValues(alpha: 0.2),
-                      spreadRadius: 4,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.location_on,
-                  size: 20,
-                  color: Colors.white,
-                ),
+              Positioned.fill(
+                child: _latitud == null ? _buildMapaVacio() : _buildMapa(),
               ),
               Positioned(
                 left: 8,
-                bottom: 8,
+                top: 8,
                 child: _InsigniaMapa(
                   icono: Icons.radar,
                   texto: 'Radio: $radioTexto',
@@ -777,6 +854,12 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
             ],
           ),
         ),
+
+        if (_latitud != null)
+          const Text(
+            'Toca el mapa para mover el punto si no estás en el salón.',
+            style: TextStyle(color: AppColors.outline, fontSize: 11),
+          ),
 
         Row(
           children: [
@@ -1035,22 +1118,27 @@ class _Tarjeta extends StatelessWidget {
         children: [
           Row(
             children: [
-              Flexible(
-                child: Text(
-                  titulo.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.8,
-                  ),
+              // Wrap: si no cabe, la etiqueta baja de línea sin partir el título
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      titulo.toUpperCase(),
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    if (etiqueta != null)
+                      _Etiqueta(etiqueta!, destacada: !etiquetaNeutra),
+                  ],
                 ),
               ),
-              if (etiqueta != null) ...[
-                const SizedBox(width: 8),
-                _Etiqueta(etiqueta!, destacada: !etiquetaNeutra),
-              ],
-              const Spacer(),
               ?accion,
             ],
           ),
@@ -1246,6 +1334,30 @@ class _MarcaRadio extends StatelessWidget {
         fontSize: 11,
         fontWeight: FontWeight.w600,
       ),
+    );
+  }
+}
+
+/// Pin verde que marca el lugar del curso.
+class _PinUbicacion extends StatelessWidget {
+  const _PinUbicacion();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: AppColors.primaryDark,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.2),
+            spreadRadius: 4,
+          ),
+        ],
+      ),
+      child: const Icon(Icons.location_on, size: 20, color: Colors.white),
     );
   }
 }

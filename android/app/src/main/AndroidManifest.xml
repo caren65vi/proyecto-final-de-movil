@@ -2,6 +2,8 @@
     <!-- Ubicación para fijar el lugar del curso y validar asistencia -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Internet para Firebase y los mapas de OpenStreetMap -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:label="ceiba"
