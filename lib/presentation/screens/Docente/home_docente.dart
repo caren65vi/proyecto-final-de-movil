@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/entities/usuario.dart';
+import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../theme/app_colors.dart';
 import 'crear_curso.dart';
@@ -17,10 +18,12 @@ class HomeDocenteScreen extends StatefulWidget {
     super.key,
     required this.usuario,
     required this.cerrarSesion,
+    required this.cursoRepository,
   });
 
   final Usuario usuario;
   final CerrarSesion cerrarSesion;
+  final CursoRepository cursoRepository;
 
   @override
   State<HomeDocenteScreen> createState() => _HomeDocenteScreenState();
@@ -152,7 +155,12 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
         _BotonNuevoCurso(
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const CrearCursoScreen()),
+            MaterialPageRoute(
+              builder: (_) => CrearCursoScreen(
+                usuario: widget.usuario,
+                cursoRepository: widget.cursoRepository,
+              ),
+            ),
           ),
         ),
 

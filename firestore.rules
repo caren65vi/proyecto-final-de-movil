@@ -105,7 +105,8 @@ service cloud.firestore {
                     && request.resource.data.metaAsistencia > 0
                     && request.resource.data.metaAsistencia <= 1
                     && request.resource.data.horario is list
-                    && request.resource.data.totalEstudiantes == 0
+                    && request.resource.data.ubicacion is latlng
+                    && request.resource.data.radioMetros is number
                     && request.resource.data.sesionesCerradas == 0
                     && request.resource.data.totalPresentes == 0
                     && request.resource.data.totalAusentes == 0
@@ -114,9 +115,10 @@ service cloud.firestore {
       // El dueño edita los datos del curso; los contadores los lleva el servidor
       allow update: if esDueno(grupoId)
                     && soloCambia([
-                         'codigoMateria', 'nombreMateria', 'numeroGrupo',
-                         'docenteNombre', 'horasTotales', 'metaAsistencia',
-                         'horario'
+                         'nombreMateria', 'facultad', 'numeroGrupo', 'aula',
+                         'docenteNombre', 'periodoId', 'fechaInicio', 'fechaFin',
+                         'horasTotales', 'metaAsistencia', 'horario',
+                         'ubicacion', 'radioMetros'
                        ]);
 
       allow delete: if esDueno(grupoId);

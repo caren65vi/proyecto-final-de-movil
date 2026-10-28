@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/repositories/auth_repository.dart';
+import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../theme/app_colors.dart';
 import '../Docente/home_docente.dart';
@@ -18,6 +19,7 @@ class LoginScreen extends StatefulWidget {
     required this.enviarCorreoVerificacion,
     required this.comprobarCorreoVerificado,
     required this.cerrarSesion,
+    required this.cursoRepository,
   });
 
   // Caso de uso que valida el correo y la contraseña en Firebase
@@ -27,6 +29,7 @@ class LoginScreen extends StatefulWidget {
   final EnviarCorreoVerificacion enviarCorreoVerificacion;
   final ComprobarCorreoVerificado comprobarCorreoVerificado;
   final CerrarSesion cerrarSesion;
+  final CursoRepository cursoRepository;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -70,6 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ? HomeDocenteScreen(
                   usuario: usuario,
                   cerrarSesion: widget.cerrarSesion,
+                  cursoRepository: widget.cursoRepository,
                 )
               : HomeEstudianteScreen(
                   usuario: usuario,

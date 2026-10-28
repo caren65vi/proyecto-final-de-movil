@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../domain/entities/bloque_horario.dart';
+import '../../../domain/entities/curso.dart';
+import '../../../domain/entities/estudiante_inscrito.dart';
+import '../../../domain/entities/usuario.dart';
+import '../../../domain/repositories/curso_repository.dart';
+import '../../../domain/usecases/curso_usecases.dart';
 import '../../theme/app_colors.dart';
 
 /// Una sesión semanal del curso: día y rango de horas.
@@ -11,10 +17,17 @@ class _Sesion {
   const _Sesion({required this.dia, required this.desde, required this.hasta});
 }
 
-/// Formulario para registrar un curso nuevo (solo interfaz; el guardado
-/// en Firestore se conectará después).
+/// Formulario para registrar un curso nuevo y guardarlo en Firestore.
 class CrearCursoScreen extends StatefulWidget {
-  const CrearCursoScreen({super.key});
+  const CrearCursoScreen({
+    super.key,
+    required this.usuario,
+    required this.cursoRepository,
+  });
+
+  // Docente con sesión abierta: queda como dueño del curso
+  final Usuario usuario;
+  final CursoRepository cursoRepository;
 
   @override
   State<CrearCursoScreen> createState() => _CrearCursoScreenState();
@@ -69,6 +82,24 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
   // Radio (en metros) dentro del cual se valida la asistencia
   double _radio = 50;
 
+  // Ubicación del curso (se fija con el GPS del docente)
+  double? _latitud;
+  double? _longitud;
+  bool _buscandoUbicacion = false;
+
+  // Lista de estudiantes importada del archivo (opcional)
+  List<EstudianteInscrito> _estudiantes = [];
+  String? _nombreArchivo;
+
+  bool _guardando = false;
+
+  // Casos de uso, armados con el repositorio que llega de afuera
+  late final _crearCurso = CrearCurso(widget.cursoRepository);
+  late final _obtenerMiUbicacion = ObtenerMiUbicacion(widget.cursoRepository);
+  late final _importarEstudiantes = ImportarEstudiantes(
+    widget.cursoRepository,
+  );
+
   @override
   void dispose() {
     _nombreController.dispose();
@@ -88,6 +119,11 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
   }
 
   int _minutos(TimeOfDay t) => t.hour * 60 + t.minute;
+
+  // Ej. "07:00" (formato 24 h que se guarda en Firestore)
+  String _hhmm(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:'
+      '${t.minute.toString().padLeft(2, '0')}';
 
   void _mostrarError(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -146,7 +182,36 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
     });
   }
 
-  void _crearCurso() {
+  Future<void> _fijarUbicacion() async {
+    setState(() => _buscandoUbicacion = true);
+    try {
+      final ubicacion = await _obtenerMiUbicacion();
+      if (!mounted) return;
+      setState(() {
+        _latitud = ubicacion.latitud;
+        _longitud = ubicacion.longitud;
+      });
+    } on CursoError catch (e) {
+      if (mounted) _mostrarError(e.mensaje);
+    } finally {
+      if (mounted) setState(() => _buscandoUbicacion = false);
+    }
+  }
+
+  Future<void> _elegirArchivo() async {
+    try {
+      final resultado = await _importarEstudiantes();
+      if (resultado == null || !mounted) return; // canceló
+      setState(() {
+        _estudiantes = resultado.estudiantes;
+        _nombreArchivo = resultado.nombreArchivo;
+      });
+    } on CursoError catch (e) {
+      if (mounted) _mostrarError(e.mensaje);
+    }
+  }
+
+  Future<void> _guardarCurso() async {
     final formularioValido = _formKey.currentState!.validate();
     if (!formularioValido) return;
 
@@ -158,8 +223,46 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
       _mostrarError('Agrega al menos un horario de clase.');
       return;
     }
+    if (_latitud == null || _longitud == null) {
+      _mostrarError('Fija la ubicación del curso.');
+      return;
+    }
 
-    // TODO: guardar el curso en Firestore cuando se configure el backend
+    final curso = Curso(
+      nombreMateria: _nombreController.text.trim(),
+      facultad: _facultad!,
+      numeroGrupo: '$_grupo',
+      aula: _salonController.text.trim(),
+      docenteUid: widget.usuario.uid,
+      docenteNombre: widget.usuario.nombre,
+      fechaInicio: _periodo!.start,
+      fechaFin: _periodo!.end,
+      horario: [
+        for (final s in _sesiones)
+          BloqueHorario(
+            dia: s.dia + 1, // _dias empieza en lunes = 0
+            inicio: _hhmm(s.desde),
+            fin: _hhmm(s.hasta),
+          ),
+      ],
+      latitud: _latitud!,
+      longitud: _longitud!,
+      radioMetros: _radio.round(),
+    );
+
+    setState(() => _guardando = true);
+    try {
+      await _crearCurso(curso, _estudiantes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Curso creado')));
+      Navigator.pop(context, true);
+    } on CursoError catch (e) {
+      if (mounted) _mostrarError(e.mensaje);
+    } finally {
+      if (mounted) setState(() => _guardando = false);
+    }
   }
 
   @override
@@ -240,19 +343,28 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                onPressed: _crearCurso,
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Crear Curso'),
-                    SizedBox(width: 8),
-                    Icon(
-                      Icons.check_circle_outline,
-                      size: 20,
-                      color: Color(0xFFFFE088),
-                    ),
-                  ],
-                ),
+                onPressed: _guardando ? null : _guardarCurso,
+                child: _guardando
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Crear Curso'),
+                          SizedBox(width: 8),
+                          Icon(
+                            Icons.check_circle_outline,
+                            size: 20,
+                            color: Color(0xFFFFE088),
+                          ),
+                        ],
+                      ),
               ),
             ),
             const SizedBox(height: 8),
@@ -651,6 +763,17 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
                   texto: 'Radio: $radioTexto',
                 ),
               ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: _InsigniaMapa(
+                  icono: _latitud == null ? Icons.gps_off : Icons.gps_fixed,
+                  texto: _latitud == null
+                      ? 'Sin ubicación'
+                      : '${_latitud!.toStringAsFixed(5)}, '
+                            '${_longitud!.toStringAsFixed(5)}',
+                ),
+              ),
             ],
           ),
         ),
@@ -658,8 +781,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
         Row(
           children: [
             OutlinedButton.icon(
-              // TODO: obtener la ubicación del dispositivo
-              onPressed: () {},
+              onPressed: _buscandoUbicacion ? null : _fijarUbicacion,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primaryDark,
                 side: const BorderSide(color: AppColors.primaryDark),
@@ -671,8 +793,16 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              icon: const Icon(Icons.my_location, size: 16),
-              label: const Text('Fijar mi ubicación'),
+              icon: _buscandoUbicacion
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.my_location, size: 16),
+              label: Text(
+                _latitud == null ? 'Fijar mi ubicación' : 'Actualizar ubicación',
+              ),
             ),
             const Spacer(),
             Container(
@@ -775,8 +905,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
       etiquetaNeutra: true,
       children: [
         InkWell(
-          // TODO: elegir el archivo Excel/CSV e importar los estudiantes
-          onTap: () {},
+          onTap: _elegirArchivo,
           borderRadius: BorderRadius.circular(12),
           child: CustomPaint(
             painter: _BordePunteadoPainter(color: AppColors.outlineVariant),
@@ -834,6 +963,37 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
             ),
           ),
         ),
+        if (_estudiantes.isNotEmpty)
+          Row(
+            children: [
+              const Icon(
+                Icons.check_circle,
+                size: 18,
+                color: AppColors.primaryDark,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${_estudiantes.length} estudiantes · $_nombreArchivo',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Quitar lista',
+                onPressed: () => setState(() {
+                  _estudiantes = [];
+                  _nombreArchivo = null;
+                }),
+                color: AppColors.outline,
+                icon: const Icon(Icons.close, size: 18),
+              ),
+            ],
+          ),
       ],
     );
   }
