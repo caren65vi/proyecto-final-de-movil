@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../domain/entities/usuario.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../theme/app_colors.dart';
+import 'crear_curso.dart';
 import 'estadisticas_docente.dart';
 import 'perfil_docente.dart';
 
@@ -147,8 +148,13 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
 
         const SizedBox(height: 24),
 
-        // 2. Registrar nuevo curso (aún sin destino)
-        _BotonNuevoCurso(onTap: () {}),
+        // 2. Registrar nuevo curso
+        _BotonNuevoCurso(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CrearCursoScreen()),
+          ),
+        ),
 
         const SizedBox(height: 24),
 
