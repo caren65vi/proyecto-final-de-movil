@@ -35,6 +35,19 @@ class CursoRepositoryImpl implements CursoRepository {
   }
 
   @override
+  Stream<List<Curso>> misCursos(String docenteUid) {
+    return cursoDatasource.misCursos(docenteUid).handleError((Object e) {
+      if (e is FirebaseException && e.code == 'permission-denied') {
+        throw const CursoError('No tienes permiso para ver estos cursos');
+      }
+      if (e is FirebaseException) {
+        throw CursoError('Error de conexión con Firebase (${e.code})');
+      }
+      throw e;
+    });
+  }
+
+  @override
   Future<({double latitud, double longitud})> obtenerUbicacionActual() =>
       ubicacionDatasource.obtenerUbicacionActual();
 

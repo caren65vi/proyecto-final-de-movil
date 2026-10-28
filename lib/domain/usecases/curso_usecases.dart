@@ -27,6 +27,19 @@ class CrearCurso {
   }
 }
 
+class ObtenerMisCursos {
+  final CursoRepository repositorio;
+  ObtenerMisCursos(this.repositorio);
+
+  // Del más reciente al más antiguo según la fecha de inicio
+  Stream<List<Curso>> call(String docenteUid) => repositorio
+      .misCursos(docenteUid)
+      .map(
+        (cursos) =>
+            [...cursos]..sort((a, b) => b.fechaInicio.compareTo(a.fechaInicio)),
+      );
+}
+
 class ObtenerMiUbicacion {
   final CursoRepository repositorio;
   ObtenerMiUbicacion(this.repositorio);

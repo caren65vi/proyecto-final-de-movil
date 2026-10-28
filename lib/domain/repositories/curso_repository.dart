@@ -15,6 +15,9 @@ abstract class CursoRepository {
   /// Guarda el curso y su lista de estudiantes; devuelve el ID del curso.
   Future<String> crearCurso(Curso curso, List<EstudianteInscrito> estudiantes);
 
+  /// Cursos del docente; emite una lista nueva cada vez que cambian.
+  Stream<List<Curso>> misCursos(String docenteUid);
+
   /// Ubicación actual del celular (pide permiso si hace falta).
   Future<({double latitud, double longitud})> obtenerUbicacionActual();
 
