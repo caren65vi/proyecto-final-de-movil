@@ -4,7 +4,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'FireBase/firebase_options.dart';
 import 'data/datasources/auth_datasource.dart';
+import 'data/datasources/curso_datasource.dart';
+import 'data/datasources/lista_estudiantes_datasource.dart';
+import 'data/datasources/ubicacion_datasource.dart';
 import 'data/repositories/auth_repository_impl.dart';
+import 'data/repositories/curso_repository_impl.dart';
 import 'domain/usecases/auth_usecases.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/theme/app_theme.dart';
@@ -22,6 +26,11 @@ class CeibaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // Se arman las capas: datasource → repositorio → caso de uso → pantalla
     final authRepository = AuthRepositoryImpl(AuthDatasource());
+    final cursoRepository = CursoRepositoryImpl(
+      cursoDatasource: CursoDatasource(),
+      ubicacionDatasource: UbicacionDatasource(),
+      listaDatasource: ListaEstudiantesDatasource(),
+    );
 
     return MaterialApp(
       title: 'Ceiba',
@@ -38,6 +47,7 @@ class CeibaApp extends StatelessWidget {
         enviarCorreoVerificacion: EnviarCorreoVerificacion(authRepository),
         comprobarCorreoVerificado: ComprobarCorreoVerificado(authRepository),
         cerrarSesion: CerrarSesion(authRepository),
+        cursoRepository: cursoRepository,
       ),
     );
   }

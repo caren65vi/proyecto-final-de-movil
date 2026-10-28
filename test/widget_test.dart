@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ceiba/domain/entities/curso.dart';
+import 'package:ceiba/domain/entities/estudiante_inscrito.dart';
 import 'package:ceiba/domain/entities/usuario.dart';
 import 'package:ceiba/domain/repositories/auth_repository.dart';
+import 'package:ceiba/domain/repositories/curso_repository.dart';
 import 'package:ceiba/domain/usecases/auth_usecases.dart';
 import 'package:ceiba/presentation/screens/auth/login_screen.dart';
 
@@ -46,6 +49,23 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> cerrarSesion() async {}
 }
 
+/// Repositorio de cursos falso: las pruebas del login no lo usan.
+class FakeCursoRepository implements CursoRepository {
+  @override
+  Future<String> crearCurso(
+    Curso curso,
+    List<EstudianteInscrito> estudiantes,
+  ) async => 'curso-prueba';
+
+  @override
+  Future<({double latitud, double longitud})> obtenerUbicacionActual() async =>
+      (latitud: 1.619816, longitud: -75.604029);
+
+  @override
+  Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
+  importarEstudiantes() async => null;
+}
+
 Future<void> abrirLogin(WidgetTester tester) {
   final repository = FakeAuthRepository();
   return tester.pumpWidget(
@@ -57,6 +77,7 @@ Future<void> abrirLogin(WidgetTester tester) {
         enviarCorreoVerificacion: EnviarCorreoVerificacion(repository),
         comprobarCorreoVerificado: ComprobarCorreoVerificado(repository),
         cerrarSesion: CerrarSesion(repository),
+        cursoRepository: FakeCursoRepository(),
       ),
     ),
   );
