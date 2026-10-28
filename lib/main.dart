@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'FireBase/firebase_options.dart';
 import 'data/datasources/auth_datasource.dart';
@@ -26,6 +27,10 @@ class CeibaApp extends StatelessWidget {
       title: 'Ceiba',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      // Calendarios, selectores de hora y demás textos de Flutter en español
+      locale: const Locale('es'),
+      supportedLocales: const [Locale('es')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       home: LoginScreen(
         iniciarSesion: IniciarSesion(authRepository),
         registrarUsuario: RegistrarUsuario(authRepository),
