@@ -2,24 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
+import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
-import 'verify_email_screen.dart';
 
 enum UserRole { student, teacher }
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({
-    super.key,
-    required this.registrarUsuario,
-    required this.enviarCorreoVerificacion,
-    required this.comprobarCorreoVerificado,
-    required this.cerrarSesion,
-  });
+  const RegisterScreen({super.key, required this.registrarUsuario});
 
   final RegistrarUsuario registrarUsuario;
-  final EnviarCorreoVerificacion enviarCorreoVerificacion;
-  final ComprobarCorreoVerificado comprobarCorreoVerificado;
-  final CerrarSesion cerrarSesion;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -137,16 +128,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       // Reemplaza el registro: la cuenta ya existe y no debe volver al formulario
-      Navigator.pushReplacement(
+      Navigator.pushReplacementNamed(
         context,
-        MaterialPageRoute(
-          builder: (context) => VerifyEmailScreen(
-            email: _emailController.text.trim(),
-            enviarCorreoVerificacion: widget.enviarCorreoVerificacion,
-            comprobarCorreoVerificado: widget.comprobarCorreoVerificado,
-            cerrarSesion: widget.cerrarSesion,
-          ),
-        ),
+        AppRoutes.verificarCorreo,
+        arguments: _emailController.text.trim(),
       );
     } on AuthError catch (e) {
       _showError(e.mensaje);

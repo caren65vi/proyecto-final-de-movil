@@ -29,6 +29,7 @@ class UsuarioModel extends Usuario {
         'nombre': nombre,
         'correo': correo,
         'rol': rol,
-        'fechaCreacion': Timestamp.fromDate(fechaCreacion),
+        // Hora del servidor, no la del celular
+        'fechaCreacion': FieldValue.serverTimestamp(),
       };
 }

@@ -41,4 +41,16 @@ class CursoRepositoryImpl implements CursoRepository {
   @override
   Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
   importarEstudiantes() => listaDatasource.importarEstudiantes();
+
+  @override
+  Stream<List<Curso>> misCursos(String docenteUid) =>
+      cursoDatasource.misCursos(docenteUid).handleError((Object error) {
+        if (error is FirebaseException) {
+          if (error.code == 'permission-denied') {
+            throw const CursoError('No tienes permiso para ver estos cursos');
+          }
+          throw CursoError('Error de conexión con Firebase (${error.code})');
+        }
+        throw error;
+      });
 }

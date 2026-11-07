@@ -9,6 +9,8 @@ class AppColors {
 
   static const Color secondary = Color(0xFFE06D53);
   static const Color tertiary = Color(0xFFD4AF37);
+  static const Color onPrimaryContainer = Color(0xFF86BEAB);
+  static const Color onTertiaryContainer = Color(0xFF4E3D00);
 
   // Tonos claros de la marca (brillos y fondos de íconos)
   static const Color primaryFixed = Color(0xFFB5EFDA);

@@ -9,9 +9,8 @@ import 'data/datasources/lista_estudiantes_datasource.dart';
 import 'data/datasources/ubicacion_datasource.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'data/repositories/curso_repository_impl.dart';
-import 'domain/usecases/auth_usecases.dart';
-import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/theme/app_theme.dart';
+import 'routes/app_routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,12 +23,16 @@ class CeibaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Se arman las capas: datasource → repositorio → caso de uso → pantalla
+    // Se arman las capas: datasource → repositorio → rutas → pantallas
     final authRepository = AuthRepositoryImpl(AuthDatasource());
     final cursoRepository = CursoRepositoryImpl(
       cursoDatasource: CursoDatasource(),
       ubicacionDatasource: UbicacionDatasource(),
       listaDatasource: ListaEstudiantesDatasource(),
+    );
+    final rutas = AppRoutes(
+      authRepository: authRepository,
+      cursoRepository: cursoRepository,
     );
 
     return MaterialApp(
@@ -40,15 +43,8 @@ class CeibaApp extends StatelessWidget {
       locale: const Locale('es'),
       supportedLocales: const [Locale('es')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      home: LoginScreen(
-        iniciarSesion: IniciarSesion(authRepository),
-        registrarUsuario: RegistrarUsuario(authRepository),
-        recuperarContrasena: RecuperarContrasena(authRepository),
-        enviarCorreoVerificacion: EnviarCorreoVerificacion(authRepository),
-        comprobarCorreoVerificado: ComprobarCorreoVerificado(authRepository),
-        cerrarSesion: CerrarSesion(authRepository),
-        cursoRepository: cursoRepository,
-      ),
+      initialRoute: AppRoutes.login,
+      onGenerateRoute: rutas.generarRuta,
     );
   }
 }

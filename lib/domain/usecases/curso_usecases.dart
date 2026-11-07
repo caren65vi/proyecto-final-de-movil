@@ -35,6 +35,14 @@ class ObtenerMiUbicacion {
       repositorio.obtenerUbicacionActual();
 }
 
+class ObtenerMisCursos {
+  final CursoRepository repositorio;
+  ObtenerMisCursos(this.repositorio);
+
+  Stream<List<Curso>> call(String docenteUid) =>
+      repositorio.misCursos(docenteUid);
+}
+
 class ImportarEstudiantes {
   final CursoRepository repositorio;
   ImportarEstudiantes(this.repositorio);

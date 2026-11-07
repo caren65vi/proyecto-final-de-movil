@@ -22,4 +22,6 @@ abstract class CursoRepository {
   /// Devuelve null si el docente cancela.
   Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
   importarEstudiantes();
+
+  Stream<List<Curso>> misCursos(String docenteUid);
 }
