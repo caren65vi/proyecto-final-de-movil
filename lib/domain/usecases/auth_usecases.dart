@@ -11,7 +11,7 @@ class IniciarSesion {
     if (correo.trim().isEmpty || contrasena.isEmpty) {
       throw const AuthError('Escribe tu correo y tu contraseña');
     }
-    return repositorio.iniciarSesion(correo.trim(), contrasena);
+    return repositorio.iniciarSesion(correo.trim().toLowerCase(), contrasena);
   }
 }
 
@@ -39,7 +39,7 @@ class RegistrarUsuario {
     }
     final usuario = await repositorio.registrar(
       nombre: nombre.trim(),
-      correo: correo.trim(),
+      correo: correo.trim().toLowerCase(),
       contrasena: contrasena,
       rol: rol,
     );
@@ -78,7 +78,7 @@ class RecuperarContrasena {
     if (correo.trim().isEmpty) {
       throw const AuthError('Escribe tu correo');
     }
-    return repositorio.recuperarContrasena(correo.trim());
+    return repositorio.recuperarContrasena(correo.trim().toLowerCase());
   }
 }
 

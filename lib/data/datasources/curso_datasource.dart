@@ -18,7 +18,10 @@ class CursoDatasource {
     List<EstudianteInscrito> estudiantes,
   ) async {
     // Primero el curso: las reglas revisan que el docente sea su dueño
-    final ref = await _grupos.add(CursoModel.toMap(curso));
+    final ref = await _grupos.add({
+      ...CursoModel.toMap(curso),
+      'totalEstudiantes': estudiantes.length,
+    });
 
     // Firestore acepta máximo 500 escrituras por lote
     for (var i = 0; i < estudiantes.length; i += 500) {
@@ -33,4 +36,13 @@ class CursoDatasource {
     }
     return ref.id;
   }
+
+  Stream<List<Curso>> misCursos(String docenteUid) => _grupos
+      .where('docenteUid', isEqualTo: docenteUid)
+      .snapshots()
+      .map((snapshot) {
+        final cursos = snapshot.docs.map(CursoModel.fromFirestore).toList();
+        cursos.sort((a, b) => a.nombreMateria.compareTo(b.nombreMateria));
+        return cursos;
+      });
 }

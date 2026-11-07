@@ -16,6 +16,7 @@ class Curso {
   final double longitud;
   final int radioMetros;
   final double metaAsistencia; // 0.8 = 80 %
+  final int totalEstudiantes;
 
   const Curso({
     this.id,
@@ -32,6 +33,7 @@ class Curso {
     required this.longitud,
     required this.radioMetros,
     this.metaAsistencia = 0.8,
+    this.totalEstudiantes= 0,
   });
 
   // Semestre según el mes de inicio: "2026-1" (ene–jun) o "2026-2" (jul–dic)

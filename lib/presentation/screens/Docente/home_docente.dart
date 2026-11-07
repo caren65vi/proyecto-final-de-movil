@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../domain/entities/curso.dart';
 import '../../../domain/entities/usuario.dart';
-import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
+import '../../../domain/usecases/curso_usecases.dart';
+import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
-import 'crear_curso.dart';
 import 'estadisticas_docente.dart';
 import 'perfil_docente.dart';
-
-// Tonos del diseño que no están en AppColors
-const Color _onPrimaryContainer = Color(0xFF86BEAB);
-const Color _onTertiaryContainer = Color(0xFF4E3D00);
 
 /// Pantalla de inicio del docente: saludo, nuevo curso y lista de cursos.
 class HomeDocenteScreen extends StatefulWidget {
@@ -18,12 +15,12 @@ class HomeDocenteScreen extends StatefulWidget {
     super.key,
     required this.usuario,
     required this.cerrarSesion,
-    required this.cursoRepository,
+    required this.obtenerMisCursos,
   });
 
   final Usuario usuario;
   final CerrarSesion cerrarSesion;
-  final CursoRepository cursoRepository;
+  final ObtenerMisCursos obtenerMisCursos;
 
   @override
   State<HomeDocenteScreen> createState() => _HomeDocenteScreenState();
@@ -32,8 +29,15 @@ class HomeDocenteScreen extends StatefulWidget {
 class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
   // 0 = Inicio, 1 = Estadísticas, 2 = Perfil
   int _pestana = 0;
+  late final Stream<List<Curso>> _misCursos;
 
   static const _titulos = ['Inicio', 'Estadísticas', 'Perfil'];
+
+  @override
+  void initState() {
+    super.initState();
+    _misCursos = widget.obtenerMisCursos(widget.usuario.uid);
+  }
 
   // Cierra la sesión en Firebase y vuelve al login (la primera pantalla)
   Future<void> _cerrarSesion() async {
@@ -45,10 +49,7 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
   @override
   Widget build(BuildContext context) {
     // Solo se sale con "Cerrar sesión", no con el botón atrás
-    return PopScope(
-      canPop: false,
-      child: _buildScaffold(),
-    );
+    return PopScope(canPop: false, child: _buildScaffold());
   }
 
   Widget _buildScaffold() {
@@ -102,9 +103,9 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
         0 => _buildInicio(),
         1 => const EstadisticasDocente(),
         _ => PerfilDocente(
-            usuario: widget.usuario,
-            onCerrarSesion: _cerrarSesion,
-          ),
+          usuario: widget.usuario,
+          onCerrarSesion: _cerrarSesion,
+        ),
       },
       bottomNavigationBar: NavigationBar(
         selectedIndex: _pestana,
@@ -153,14 +154,10 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
 
         // 2. Registrar nuevo curso
         _BotonNuevoCurso(
-          onTap: () => Navigator.push(
+          onTap: () => Navigator.pushNamed(
             context,
-            MaterialPageRoute(
-              builder: (_) => CrearCursoScreen(
-                usuario: widget.usuario,
-                cursoRepository: widget.cursoRepository,
-              ),
-            ),
+            AppRoutes.crearCurso,
+            arguments: widget.usuario,
           ),
         ),
 
@@ -174,6 +171,42 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
+        ),
+        const SizedBox(height: 12),
+        StreamBuilder<List<Curso>>(
+          stream: _misCursos,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Text(
+                'Error al cargar los cursos: ${snapshot.error}',
+                style: const TextStyle(color: Colors.red),
+              );
+            }
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final cursos = snapshot.data!;
+            if (cursos.isEmpty) {
+              return const Text('Aún no tienes cursos');
+            }
+
+            return Column(
+              children: [
+                for (final curso in cursos)
+                  Card(
+                    child: ListTile(
+                      title: Text(
+                        '${curso.numeroGrupo} · ${curso.nombreMateria}',
+                      ),
+                      subtitle: Text(
+                        '${curso.facultad} · ${curso.totalEstudiantes} Alumnos',
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -231,7 +264,7 @@ class _BotonNuevoCurso extends StatelessWidget {
                     child: const Icon(
                       Icons.add,
                       size: 26,
-                      color: _onTertiaryContainer,
+                      color: AppColors.onTertiaryContainer,
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -251,7 +284,7 @@ class _BotonNuevoCurso extends StatelessWidget {
                         Text(
                           'Apertura de grupo, cupos y sílabo',
                           style: TextStyle(
-                            color: _onPrimaryContainer,
+                            color: AppColors.onPrimaryContainer,
                             fontSize: 12,
                           ),
                         ),

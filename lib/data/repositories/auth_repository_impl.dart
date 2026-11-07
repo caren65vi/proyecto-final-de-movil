@@ -17,14 +17,24 @@ class AuthRepositoryImpl implements AuthRepository {
     required String contrasena,
     required String rol,
   }) {
-    return _traducirErrores(
-      () => datasource.registrar(
-        nombre: nombre,
-        correo: correo,
-        contrasena: contrasena,
-        rol: rol,
-      ),
-    );
+    return _traducirErrores(() async {
+      try {
+        return await datasource.registrar(
+          nombre: nombre,
+          correo: correo,
+          contrasena: contrasena,
+          rol: rol,
+        );
+      } on FirebaseException catch (e) {
+        // Las reglas rechazan el rol docente si el correo no está autorizado
+        if (e.code == 'permission-denied' && rol == 'docente') {
+          throw const AuthError(
+            'Tu correo no está autorizado como docente. Pide que lo agreguen.',
+          );
+        }
+        rethrow;
+      }
+    });
   }
 
   @override

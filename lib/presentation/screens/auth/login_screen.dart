@@ -1,35 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/repositories/auth_repository.dart';
-import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
+import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
-import '../Docente/home_docente.dart';
-import '../Estudiante/home_estudiante.dart';
-import 'recover_password_screen.dart';
-import 'register_screen.dart';
-import 'verify_email_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({
-    super.key,
-    required this.iniciarSesion,
-    required this.registrarUsuario,
-    required this.recuperarContrasena,
-    required this.enviarCorreoVerificacion,
-    required this.comprobarCorreoVerificado,
-    required this.cerrarSesion,
-    required this.cursoRepository,
-  });
+  const LoginScreen({super.key, required this.iniciarSesion});
 
   // Caso de uso que valida el correo y la contraseña en Firebase
   final IniciarSesion iniciarSesion;
-  final RegistrarUsuario registrarUsuario;
-  final RecuperarContrasena recuperarContrasena;
-  final EnviarCorreoVerificacion enviarCorreoVerificacion;
-  final ComprobarCorreoVerificado comprobarCorreoVerificado;
-  final CerrarSesion cerrarSesion;
-  final CursoRepository cursoRepository;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -67,19 +47,10 @@ class _LoginScreenState extends State<LoginScreen> {
       // El login queda debajo para volver a él al cerrar sesión;
       // cada inicio controla el botón atrás
       _passwordController.clear();
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => usuario.esDocente
-              ? HomeDocenteScreen(
-                  usuario: usuario,
-                  cerrarSesion: widget.cerrarSesion,
-                  cursoRepository: widget.cursoRepository,
-                )
-              : HomeEstudianteScreen(
-                  usuario: usuario,
-                  cerrarSesion: widget.cerrarSesion,
-                ),
-        ),
+      Navigator.pushNamed(
+        context,
+        AppRoutes.homeDe(usuario),
+        arguments: usuario,
       );
     } on CorreoNoVerificadoError catch (e) {
       // La contraseña es correcta pero falta abrir el enlace del correo
@@ -102,41 +73,24 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _forgotPassword() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RecoverPasswordScreen(
-          recuperarContrasena: widget.recuperarContrasena,
-          // Si ya escribió su correo en el login, se reutiliza
-          correoInicial: _emailController.text.trim(),
-        ),
-      ),
+    Navigator.pushNamed(
+      context,
+      AppRoutes.recuperarContrasena,
+      // Si ya escribió su correo en el login, se reutiliza
+      arguments: _emailController.text.trim(),
     );
   }
 
   void _abrirVerificacion() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VerifyEmailScreen(
-          email: _emailController.text.trim(),
-          enviarCorreoVerificacion: widget.enviarCorreoVerificacion,
-          comprobarCorreoVerificado: widget.comprobarCorreoVerificado,
-          cerrarSesion: widget.cerrarSesion,
-        ),
-      ),
+    Navigator.pushNamed(
+      context,
+      AppRoutes.verificarCorreo,
+      arguments: _emailController.text.trim(),
     );
   }
 
   void _createAccount() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RegisterScreen(
-          registrarUsuario: widget.registrarUsuario,
-          enviarCorreoVerificacion: widget.enviarCorreoVerificacion,
-          comprobarCorreoVerificado: widget.comprobarCorreoVerificado,
-          cerrarSesion: widget.cerrarSesion,
-        ),
-      ),
-    );
+    Navigator.pushNamed(context, AppRoutes.registro);
   }
 
   @override

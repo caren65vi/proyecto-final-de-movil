@@ -29,8 +29,15 @@ class AuthDatasource {
       rol: rol,
       fechaCreacion: DateTime.now(),
     );
-    // El ID del documento es el UID del usuario
-    await _usuarios.doc(usuario.uid).set(usuario.toMap());
+    // El ID del documento es el UID del usuario.
+    // Si no se puede guardar, se borra la cuenta para no dejarla a medias
+    // (si no, el correo quedaría "en uso" sin poder entrar ni registrarse).
+    try {
+      await _usuarios.doc(usuario.uid).set(usuario.toMap());
+    } catch (_) {
+      await credencial.user!.delete();
+      rethrow;
+    }
     return usuario;
   }
 

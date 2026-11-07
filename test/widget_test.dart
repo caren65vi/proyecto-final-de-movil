@@ -6,8 +6,7 @@ import 'package:ceiba/domain/entities/estudiante_inscrito.dart';
 import 'package:ceiba/domain/entities/usuario.dart';
 import 'package:ceiba/domain/repositories/auth_repository.dart';
 import 'package:ceiba/domain/repositories/curso_repository.dart';
-import 'package:ceiba/domain/usecases/auth_usecases.dart';
-import 'package:ceiba/presentation/screens/auth/login_screen.dart';
+import 'package:ceiba/routes/app_routes.dart';
 
 /// Repositorio falso: permite probar la pantalla sin conectarse a Firebase.
 class FakeAuthRepository implements AuthRepository {
@@ -64,21 +63,21 @@ class FakeCursoRepository implements CursoRepository {
   @override
   Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
   importarEstudiantes() async => null;
+
+  @override
+  Stream<List<Curso>> misCursos(String docenteUid) =>
+      Stream.value(const <Curso>[]);
 }
 
 Future<void> abrirLogin(WidgetTester tester) {
-  final repository = FakeAuthRepository();
+  final rutas = AppRoutes(
+    authRepository: FakeAuthRepository(),
+    cursoRepository: FakeCursoRepository(),
+  );
   return tester.pumpWidget(
     MaterialApp(
-      home: LoginScreen(
-        iniciarSesion: IniciarSesion(repository),
-        registrarUsuario: RegistrarUsuario(repository),
-        recuperarContrasena: RecuperarContrasena(repository),
-        enviarCorreoVerificacion: EnviarCorreoVerificacion(repository),
-        comprobarCorreoVerificado: ComprobarCorreoVerificado(repository),
-        cerrarSesion: CerrarSesion(repository),
-        cursoRepository: FakeCursoRepository(),
-      ),
+      initialRoute: AppRoutes.login,
+      onGenerateRoute: rutas.generarRuta,
     ),
   );
 }

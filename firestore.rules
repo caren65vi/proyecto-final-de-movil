@@ -55,10 +55,14 @@ service cloud.firestore {
 
     match /usuarios/{uid} {
 
-      // Registro: cada usuario crea solo su documento, con un rol válido
+      // Registro: cada usuario crea solo su documento.
+      // Estudiante: cualquiera. Docente: solo si su correo está en
+      // docentesAutorizados (la lista se llena desde la consola).
       allow create: if autenticado()
                     && request.auth.uid == uid
-                    && request.resource.data.rol in ['docente', 'estudiante'];
+                    && (request.resource.data.rol == 'estudiante'
+                        || (request.resource.data.rol == 'docente'
+                            && exists(/databases/$(database)/documents/docentesAutorizados/$(request.auth.token.email.lower()))));
 
       // Cada usuario lee su documento; el docente lee todos
       allow read: if autenticado()
@@ -72,6 +76,13 @@ service cloud.firestore {
                     || (esDocente() && resource.data.rol == 'estudiante');
 
       allow delete: if esDocente() && resource.data.rol == 'estudiante';
+    }
+
+    // ---------- docentes autorizados (ID = correo en minúscula) ----------
+    // Solo se edita en la consola; la app no la lee, solo la usa la regla de registro.
+
+    match /docentesAutorizados/{correo} {
+      allow read, write: if false;
     }
 
     // ---------- sedes y periodos (solo lectura; se editan en la consola) ----------
