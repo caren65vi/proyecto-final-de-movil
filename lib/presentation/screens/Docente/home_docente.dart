@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../domain/entities/curso.dart';
 import '../../../domain/entities/usuario.dart';
+import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../../domain/usecases/curso_usecases.dart';
 import '../../../routes/app_routes.dart';
@@ -29,14 +30,18 @@ class HomeDocenteScreen extends StatefulWidget {
 class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
   // 0 = Inicio, 1 = Estadísticas, 2 = Perfil
   int _pestana = 0;
-  late final Stream<List<Curso>> _misCursos;
 
   static const _titulos = ['Inicio', 'Estadísticas', 'Perfil'];
+
+  // Se crea una sola vez; asBroadcastStream permite que varias pestañas lo escuchen
+  late final Stream<List<Curso>> _misCursos;
 
   @override
   void initState() {
     super.initState();
-    _misCursos = widget.obtenerMisCursos(widget.usuario.uid);
+    _misCursos = widget
+        .obtenerMisCursos(widget.usuario.uid)
+        .asBroadcastStream();
   }
 
   // Cierra la sesión en Firebase y vuelve al login (la primera pantalla)
@@ -99,14 +104,16 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
           ],
         ),
       ),
-      body: switch (_pestana) {
-        0 => _buildInicio(),
-        1 => const EstadisticasDocente(),
-        _ => PerfilDocente(
-          usuario: widget.usuario,
-          onCerrarSesion: _cerrarSesion,
-        ),
-      },
+      // IndexedStack: las pestañas no se destruyen al cambiar y la consulta
+      // de cursos no se reinicia
+      body: IndexedStack(
+        index: _pestana,
+        children: [
+          _buildInicio(),
+          const EstadisticasDocente(),
+          PerfilDocente(usuario: widget.usuario, onCerrarSesion: _cerrarSesion),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _pestana,
         onDestinationSelected: (i) => setState(() => _pestana = i),
@@ -153,17 +160,74 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
         const SizedBox(height: 24),
 
         // 2. Registrar nuevo curso
-        _BotonNuevoCurso(
-          onTap: () => Navigator.pushNamed(
-            context,
-            AppRoutes.crearCurso,
-            arguments: widget.usuario,
-          ),
-        ),
+        _BotonNuevoCurso(onTap: _abrirCrearCurso),
 
         const SizedBox(height: 24),
 
-        // 3. Mis cursos
+        // 3. Mis cursos (se actualiza solo cuando cambian en Firestore)
+        StreamBuilder<List<Curso>>(
+          stream: _misCursos,
+          builder: (context, snapshot) {
+            final cursos = snapshot.data;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TituloMisCursos(cantidad: cursos?.length),
+                const SizedBox(height: 16),
+                if (snapshot.hasError)
+                  _MensajeLista(
+                    icono: Icons.cloud_off,
+                    texto: snapshot.error is CursoError
+                        ? (snapshot.error as CursoError).mensaje
+                        : 'No se pudieron cargar tus cursos.',
+                  )
+                else if (cursos == null)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (cursos.isEmpty)
+                  const _MensajeLista(
+                    icono: Icons.class_outlined,
+                    texto: 'Aún no has creado cursos.',
+                  )
+                else
+                  for (final curso in cursos) ...[
+                    _TarjetaCurso(curso: curso),
+                    const SizedBox(height: 16),
+                  ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _abrirCrearCurso() async {
+    // CrearCursoScreen devuelve true al guardar
+    final creado = await Navigator.pushNamed<bool>(
+      context,
+      AppRoutes.crearCurso,
+      arguments: widget.usuario,
+    );
+    if (creado == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Curso creado correctamente')),
+      );
+    }
+  }
+}
+
+class _TituloMisCursos extends StatelessWidget {
+  final int? cantidad;
+
+  const _TituloMisCursos({required this.cantidad});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
         const Text(
           'Mis Cursos',
           style: TextStyle(
@@ -172,41 +236,257 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 12),
-        StreamBuilder<List<Curso>>(
-          stream: _misCursos,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Text(
-                'Error al cargar los cursos: ${snapshot.error}',
-                style: const TextStyle(color: Colors.red),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        if (cantidad != null && cantidad! > 0) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceHigh,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '$cantidad',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
 
-            final cursos = snapshot.data!;
-            if (cursos.isEmpty) {
-              return const Text('Aún no tienes cursos');
-            }
+/// Aviso centrado para la lista vacía o con error.
+class _MensajeLista extends StatelessWidget {
+  final IconData icono;
+  final String texto;
 
-            return Column(
-              children: [
-                for (final curso in cursos)
-                  Card(
-                    child: ListTile(
-                      title: Text(
-                        '${curso.numeroGrupo} · ${curso.nombreMateria}',
-                      ),
-                      subtitle: Text(
-                        '${curso.facultad} · ${curso.totalEstudiantes} Alumnos',
+  const _MensajeLista({required this.icono, required this.texto});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Icon(icono, size: 32, color: AppColors.outline),
+          const SizedBox(height: 8),
+          Text(
+            texto,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tarjeta de un curso: grupo y aula, nombre, facultad, alumnos, fechas y acción.
+class _TarjetaCurso extends StatelessWidget {
+  final Curso curso;
+
+  /// Qué hacer al tocar "Gestionar Clase" (si es null el botón sale desactivado).
+  final VoidCallback? onTap;
+
+  const _TarjetaCurso({required this.curso, this.onTap});
+
+  static const _meses = [
+    'Ene',
+    'Feb',
+    'Mar',
+    'Abr',
+    'May',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dic',
+  ];
+
+  // Ej. "10 Feb 2025"
+  String _fecha(DateTime d) => '${d.day} ${_meses[d.month - 1]} ${d.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    final etiqueta = [
+      'Grupo ${curso.numeroGrupo}',
+      if (curso.aula.isNotEmpty) curso.aula,
+    ].join(' • ');
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Banda lateral institucional
+            Container(width: 6, color: AppColors.primary),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      etiqueta.toUpperCase(),
+                      style: const TextStyle(
+                        color: AppColors.primaryDark,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      curso.nombreMateria,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${curso.facultad} • ${curso.totalEstudiantes} Alumnos',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Fechas de inicio y fin
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLow,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _Fecha(
+                              icono: Icons.event,
+                              colorIcono: AppColors.primaryDark,
+                              etiqueta: 'Inicio:',
+                              fecha: _fecha(curso.fechaInicio),
+                            ),
+                          ),
+                          const Text(
+                            '•',
+                            style: TextStyle(color: AppColors.outlineVariant),
+                          ),
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: _Fecha(
+                                icono: Icons.event_available,
+                                colorIcono: AppColors.attendanceWarningText,
+                                etiqueta: 'Fin:',
+                                fecha: _fecha(curso.fechaFin),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      height: 44,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primaryDark,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        onPressed: onTap,
+                        icon: const Icon(Icons.fact_check_outlined, size: 18),
+                        label: const Text('Gestionar Clase'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Fecha extends StatelessWidget {
+  final IconData icono;
+  final Color colorIcono;
+  final String etiqueta;
+  final String fecha;
+
+  const _Fecha({
+    required this.icono,
+    required this.colorIcono,
+    required this.etiqueta,
+    required this.fecha,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icono, size: 16, color: colorIcono),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '$etiqueta ',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                TextSpan(text: fecha),
               ],
-            );
-          },
+            ),
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
         ),
       ],
     );

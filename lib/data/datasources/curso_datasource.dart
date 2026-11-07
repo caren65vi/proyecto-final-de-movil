@@ -37,6 +37,8 @@ class CursoDatasource {
     return ref.id;
   }
 
+  // Cursos del docente, en tiempo real, ordenados por nombre
+  // (las reglas solo permiten esta consulta: where docenteUid == uid)
   Stream<List<Curso>> misCursos(String docenteUid) => _grupos
       .where('docenteUid', isEqualTo: docenteUid)
       .snapshots()

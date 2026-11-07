@@ -57,16 +57,15 @@ class FakeCursoRepository implements CursoRepository {
   ) async => 'curso-prueba';
 
   @override
+  Stream<List<Curso>> misCursos(String docenteUid) => Stream.value(const []);
+
+  @override
   Future<({double latitud, double longitud})> obtenerUbicacionActual() async =>
       (latitud: 1.619816, longitud: -75.604029);
 
   @override
   Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
   importarEstudiantes() async => null;
-
-  @override
-  Stream<List<Curso>> misCursos(String docenteUid) =>
-      Stream.value(const <Curso>[]);
 }
 
 Future<void> abrirLogin(WidgetTester tester) {

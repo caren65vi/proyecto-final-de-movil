@@ -50,3 +50,6 @@ app.*.map.json
 # Firebase: clave privada de servicio (NUNCA subir)
 serviceAccountKey.json
 **/serviceAccountKey.json
+
+# Copias de respaldo (ej. firestore.rules.bak)
+*.bak
