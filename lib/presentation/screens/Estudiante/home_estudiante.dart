@@ -41,6 +41,18 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
 
   static const _dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 
+  late final Stream<List<MateriaEstudiante>> _materiasStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _materiasStream = widget
+        .obtenerMisMaterias(widget.usuario.correo)
+        .asBroadcastStream();
+    _escucharMaterias();
+    _enlazarCuenta();
+  }
+
   // Materias del estudiante (las comparten las pestañas Cursos y Horario)
   StreamSubscription<List<MateriaEstudiante>>? _suscripcion;
   List<MateriaEstudiante> _materias = const [];
@@ -49,32 +61,31 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
 
   // Título de la cabecera según la pestaña (Cursos y Horario solo llevan el logo)
   String? get _tituloCabecera => switch (_pestana) {
-        2 => 'Asistencia',
-        3 => 'Mi Perfil',
-        _ => null,
-      };
+    2 => 'Asistencia',
+    3 => 'Mi Perfil',
+    _ => null,
+  };
 
   // Primer nombre para el saludo (ej. "Camilo Pérez" → "Camilo")
   String get _primerNombre => widget.usuario.nombre.trim().split(' ').first;
 
-  @override
-  void initState() {
-    super.initState();
-    _escucharMaterias();
-    _enlazarCuenta();
-  }
-
   void _escucharMaterias() {
-    _suscripcion = widget.obtenerMisMaterias(widget.usuario.correo).listen(
-      (materias) => setState(() {
-        _materias = materias;
-        _cargando = false;
-        _error = null;
-      }),
-      onError: (Object e) => setState(() {
-        _cargando = false;
-        _error = e.toString();
-      }),
+    _suscripcion = _materiasStream.listen(
+      (materias) {
+        if (!mounted) return;
+        setState(() {
+          _materias = materias;
+          _cargando = false;
+          _error = null;
+        });
+      },
+      onError: (Object e) {
+        if (!mounted) return;
+        setState(() {
+          _cargando = false;
+          _error = e.toString();
+        });
+      },
     );
   }
 
@@ -90,11 +101,13 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
   // Materias que cumplen la búsqueda y el filtro por día
   List<MateriaEstudiante> get _materiasFiltradas {
     final texto = _busquedaController.text.trim().toLowerCase();
-    final dia =
-        _diaSeleccionado == null ? null : _dias.indexOf(_diaSeleccionado!) + 1;
+    final dia = _diaSeleccionado == null
+        ? null
+        : _dias.indexOf(_diaSeleccionado!) + 1;
     return _materias.where((m) {
       final c = m.curso;
-      final coincideTexto = texto.isEmpty ||
+      final coincideTexto =
+          texto.isEmpty ||
           c.nombreMateria.toLowerCase().contains(texto) ||
           c.docenteNombre.toLowerCase().contains(texto);
       final coincideDia = dia == null || c.horario.any((b) => b.dia == dia);
@@ -181,15 +194,18 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
             const SizedBox(width: 8),
           ],
         ),
-        body: switch (_pestana) {
-          0 => _buildCursos(),
-          1 => HorarioEstudiante(materias: _materias),
-          2 => const AsistenciaEstudiante(),
-          _ => PerfilEstudiante(
+        body: IndexedStack(
+          index: _pestana,
+          children: [
+            _buildCursos(),
+            HorarioEstudiante(materias: _materiasStream),
+            const AsistenciaEstudiante(),
+            PerfilEstudiante(
               usuario: widget.usuario,
               onCerrarSesion: _cerrarSesion,
             ),
-        },
+          ],
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _pestana,
           onDestinationSelected: (i) => setState(() => _pestana = i),

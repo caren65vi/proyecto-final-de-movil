@@ -32,6 +32,7 @@ class CeibaApp extends StatelessWidget {
       ubicacionDatasource: UbicacionDatasource(),
       listaDatasource: ListaEstudiantesDatasource(),
     );
+
     final inscripcionRepository = InscripcionRepositoryImpl(
       InscripcionDatasource(),
     );
