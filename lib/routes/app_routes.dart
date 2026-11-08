@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../domain/entities/usuario.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/curso_repository.dart';
+import '../domain/repositories/inscripcion_repository.dart';
 import '../domain/usecases/auth_usecases.dart';
 import '../domain/usecases/curso_usecases.dart';
+import '../domain/usecases/inscripcion_usecases.dart';
 import '../presentation/screens/Docente/crear_curso.dart';
 import '../presentation/screens/Docente/home_docente.dart';
 import '../presentation/screens/Estudiante/home_estudiante.dart';
@@ -22,10 +24,15 @@ import '../domain/entities/curso.dart';
 /// las pantallas solo navegan por nombre (`Navigator.pushNamed`) y esta clase
 /// les entrega los casos de uso y repositorios que necesitan.
 class AppRoutes {
-  AppRoutes({required this.authRepository, required this.cursoRepository});
+  AppRoutes({
+    required this.authRepository,
+    required this.cursoRepository,
+    required this.inscripcionRepository,
+  });
 
   final AuthRepository authRepository;
   final CursoRepository cursoRepository;
+  final InscripcionRepository inscripcionRepository;
 
   // ---------- Nombres de las rutas ----------
 
@@ -95,11 +102,15 @@ class AppRoutes {
       editarCurso when args is Curso => EditarCursoScreen(
         curso: args,
         editarCurso: EditarCurso(cursoRepository),
+        importarEstudiantes: ImportarEstudiantes(cursoRepository),
+        agregarEstudiante: AgregarEstudiante(cursoRepository),
       ),
       editarCurso => _RutaNoEncontrada(nombre: settings.name),
       homeEstudiante when args is Usuario => HomeEstudianteScreen(
         usuario: args,
         cerrarSesion: CerrarSesion(authRepository),
+        obtenerMisMaterias: ObtenerMisMaterias(inscripcionRepository),
+        enlazarCuenta: EnlazarCuenta(inscripcionRepository),
       ),
       homeEstudiante => _RutaNoEncontrada(nombre: settings.name),
       _ => _RutaNoEncontrada(nombre: settings.name),

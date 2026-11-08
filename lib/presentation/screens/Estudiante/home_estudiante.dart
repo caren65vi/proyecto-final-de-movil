@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../domain/entities/materia_estudiante.dart';
 import '../../../domain/entities/usuario.dart';
 import '../../../domain/usecases/auth_usecases.dart';
+import '../../../domain/usecases/inscripcion_usecases.dart';
 import '../../theme/app_colors.dart';
 import 'asistencia_estudiante.dart';
 import 'horario_estudiante.dart';
@@ -13,10 +17,14 @@ class HomeEstudianteScreen extends StatefulWidget {
     super.key,
     required this.usuario,
     required this.cerrarSesion,
+    required this.obtenerMisMaterias,
+    required this.enlazarCuenta,
   });
 
   final Usuario usuario;
   final CerrarSesion cerrarSesion;
+  final ObtenerMisMaterias obtenerMisMaterias;
+  final EnlazarCuenta enlazarCuenta;
 
   @override
   State<HomeEstudianteScreen> createState() => _HomeEstudianteScreenState();
@@ -33,6 +41,12 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
 
   static const _dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 
+  // Materias del estudiante (las comparten las pestañas Cursos y Horario)
+  StreamSubscription<List<MateriaEstudiante>>? _suscripcion;
+  List<MateriaEstudiante> _materias = const [];
+  bool _cargando = true;
+  String? _error;
+
   // Título de la cabecera según la pestaña (Cursos y Horario solo llevan el logo)
   String? get _tituloCabecera => switch (_pestana) {
         2 => 'Asistencia',
@@ -44,7 +58,53 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
   String get _primerNombre => widget.usuario.nombre.trim().split(' ').first;
 
   @override
+  void initState() {
+    super.initState();
+    _escucharMaterias();
+    _enlazarCuenta();
+  }
+
+  void _escucharMaterias() {
+    _suscripcion = widget.obtenerMisMaterias(widget.usuario.correo).listen(
+      (materias) => setState(() {
+        _materias = materias;
+        _cargando = false;
+        _error = null;
+      }),
+      onError: (Object e) => setState(() {
+        _cargando = false;
+        _error = e.toString();
+      }),
+    );
+  }
+
+  // Guarda el uid en las inscripciones; si falla, la app sigue funcionando
+  Future<void> _enlazarCuenta() async {
+    try {
+      await widget.enlazarCuenta(widget.usuario.correo, widget.usuario.uid);
+    } catch (e) {
+      debugPrint('No se pudo enlazar la cuenta: $e');
+    }
+  }
+
+  // Materias que cumplen la búsqueda y el filtro por día
+  List<MateriaEstudiante> get _materiasFiltradas {
+    final texto = _busquedaController.text.trim().toLowerCase();
+    final dia =
+        _diaSeleccionado == null ? null : _dias.indexOf(_diaSeleccionado!) + 1;
+    return _materias.where((m) {
+      final c = m.curso;
+      final coincideTexto = texto.isEmpty ||
+          c.nombreMateria.toLowerCase().contains(texto) ||
+          c.docenteNombre.toLowerCase().contains(texto);
+      final coincideDia = dia == null || c.horario.any((b) => b.dia == dia);
+      return coincideTexto && coincideDia;
+    }).toList();
+  }
+
+  @override
   void dispose() {
+    _suscripcion?.cancel();
     _busquedaController.dispose();
     super.dispose();
   }
@@ -123,7 +183,7 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
         ),
         body: switch (_pestana) {
           0 => _buildCursos(),
-          1 => const HorarioEstudiante(),
+          1 => HorarioEstudiante(materias: _materias),
           2 => const AsistenciaEstudiante(),
           _ => PerfilEstudiante(
               usuario: widget.usuario,
@@ -185,6 +245,7 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
         TextField(
           controller: _busquedaController,
           textInputAction: TextInputAction.search,
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             hintText: 'Buscar por materia o profesor...',
             hintStyle: const TextStyle(color: AppColors.outline, fontSize: 14),
@@ -235,7 +296,184 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
             ],
           ),
         ),
+
+        const SizedBox(height: 16),
+
+        ..._buildListaMaterias(),
       ],
+    );
+  }
+
+  List<Widget> _buildListaMaterias() {
+    if (_cargando) {
+      return const [
+        Padding(
+          padding: EdgeInsets.only(top: 48),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
+    }
+    if (_error != null) {
+      return [_Mensaje(icono: Icons.error_outline, texto: _error!)];
+    }
+    if (_materias.isEmpty) {
+      return const [
+        _Mensaje(
+          icono: Icons.school_outlined,
+          texto: 'Aún no estás inscrito en ninguna materia',
+        ),
+      ];
+    }
+    final materias = _materiasFiltradas;
+    if (materias.isEmpty) {
+      return const [
+        _Mensaje(
+          icono: Icons.search_off,
+          texto: 'Ninguna materia coincide con el filtro',
+        ),
+      ];
+    }
+    return [
+      for (final materia in materias) ...[
+        _TarjetaMateria(materia: materia),
+        const SizedBox(height: 12),
+      ],
+    ];
+  }
+}
+
+/// Tarjeta de una materia: nombre, docente, horario y asistencia.
+class _TarjetaMateria extends StatelessWidget {
+  final MateriaEstudiante materia;
+
+  const _TarjetaMateria({required this.materia});
+
+  static const _diasCortos = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+  @override
+  Widget build(BuildContext context) {
+    final curso = materia.curso;
+    final porcentaje = materia.inscripcion.porcentaje;
+    final alDia = porcentaje >= curso.metaAsistencia;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  curso.nombreMateria,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Porcentaje de asistencia
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: alDia
+                      ? AppColors.attendancePresent
+                      : AppColors.attendanceWarning,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${(porcentaje * 100).round()} %',
+                  style: TextStyle(
+                    color: alDia
+                        ? AppColors.attendancePresentText
+                        : AppColors.attendanceWarningText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${curso.docenteNombre} · Grupo ${curso.numeroGrupo}',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _Dato(icono: Icons.place_outlined, texto: 'Aula ${curso.aula}'),
+          for (final bloque in curso.horario) ...[
+            const SizedBox(height: 4),
+            _Dato(
+              icono: Icons.schedule,
+              texto:
+                  '${_diasCortos[bloque.dia - 1]} ${bloque.inicio} – ${bloque.fin}',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Dato extends StatelessWidget {
+  final IconData icono;
+  final String texto;
+
+  const _Dato({required this.icono, required this.texto});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icono, size: 16, color: AppColors.outline),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            texto,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Mensaje centrado con un icono (vacío, error, sin resultados).
+class _Mensaje extends StatelessWidget {
+  final IconData icono;
+  final String texto;
+
+  const _Mensaje({required this.icono, required this.texto});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 48),
+      child: Column(
+        children: [
+          Icon(icono, size: 40, color: AppColors.outline),
+          const SizedBox(height: 8),
+          Text(
+            texto,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
     );
   }
 }
