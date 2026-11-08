@@ -47,4 +47,24 @@ class CursoDatasource {
         cursos.sort((a, b) => a.nombreMateria.compareTo(b.nombreMateria));
         return cursos;
       });
+
+  //un curso por su ID, si lo borran, simplemente deja de emitir
+  Stream<Curso> curso(String grupoId) => _grupos
+      .doc(grupoId)
+      .snapshots()
+      .where((doc) => doc.exists)
+      .map(CursoModel.fromFirestore);
+
+  //Lista de clase ordenada por nombre
+
+  Stream<List<EstudianteInscrito>> estudiantes(String grupoId) =>
+      _grupos.doc(grupoId).collection('inscripciones').snapshots().map((
+        snapshot,
+      ) {
+        final lista = snapshot.docs
+            .map(EstudianteInscritoModel.fromDocument)
+            .toList();
+        lista.sort((a, b) => a.nombre.compareTo(b.nombre));
+        return lista;
+      });
 }

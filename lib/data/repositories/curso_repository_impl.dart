@@ -54,4 +54,27 @@ class CursoRepositoryImpl implements CursoRepository {
   @override
   Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
   importarEstudiantes() => listaDatasource.importarEstudiantes();
+
+  // Convierte cualquier error en un CursoError con mensaje en español
+  CursoError _traducir(Object error) {
+    if (error is CursoError) return error;
+    if (error is FirebaseException) {
+      if (error.code == 'permission-denied') {
+        return const CursoError('No tienes permiso para realizar esta acción');
+      }
+      return CursoError('Error de conexión con Firebase (${error.code})');
+    }
+    return CursoError('Ocurrió un error inesperado: $error');
+  }
+
+  @override
+  Stream<Curso> curso(String grupoId) => cursoDatasource
+      .curso(grupoId)
+      .handleError((Object error) => throw _traducir(error));
+
+  @override
+  Stream<List<EstudianteInscrito>> estudiantes(String grupoId) =>
+      cursoDatasource
+          .estudiantes(grupoId)
+          .handleError((Object error) => throw _traducir(error));
 }
