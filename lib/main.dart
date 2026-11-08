@@ -12,6 +12,7 @@ import 'data/repositories/curso_repository_impl.dart';
 import 'presentation/theme/app_theme.dart';
 import 'routes/app_routes.dart';
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
