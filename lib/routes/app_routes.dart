@@ -13,6 +13,9 @@ import '../presentation/screens/auth/recover_password_screen.dart';
 import '../presentation/screens/auth/register_screen.dart';
 import '../presentation/screens/auth/verify_email_screen.dart';
 import '../presentation/screens/Docente/detalle_curso.dart';
+import '../presentation/screens/Docente/editar_curso.dart';
+import '../domain/entities/curso.dart';
+
 /// Rutas de la aplicación.
 ///
 /// Aquí están los nombres de todas las pantallas y cómo se construyen:
@@ -49,6 +52,9 @@ class AppRoutes {
   /// Argumento: `String` con el ID del grupo y `CursoRepository`.
   static const String detalleCurso = '/docente/detalle-curso';
 
+  ///argumento : para editar del curso
+  static const String editarCurso = '/docente/editar-curso';
+
   // ---------- Construcción de las pantallas ----------
 
   /// Se usa en `MaterialApp.onGenerateRoute`.
@@ -64,30 +70,38 @@ class AppRoutes {
         recuperarContrasena: RecuperarContrasena(authRepository),
         correoInicial: args is String ? args : '',
       ),
-      verificarCorreo => VerifyEmailScreen(
-        email: args as String,
+      verificarCorreo when args is String => VerifyEmailScreen(
+        email: args,
         enviarCorreoVerificacion: EnviarCorreoVerificacion(authRepository),
         comprobarCorreoVerificado: ComprobarCorreoVerificado(authRepository),
         cerrarSesion: CerrarSesion(authRepository),
       ),
-      homeDocente => HomeDocenteScreen(
-        usuario: args as Usuario,
+      verificarCorreo => _RutaNoEncontrada(nombre: settings.name),
+      homeDocente when args is Usuario => HomeDocenteScreen(
+        usuario: args,
         cerrarSesion: CerrarSesion(authRepository),
         obtenerMisCursos: ObtenerMisCursos(cursoRepository),
       ),
-      crearCurso => CrearCursoScreen(
-        usuario: args as Usuario,
+      homeDocente => _RutaNoEncontrada(nombre: settings.name),
+      crearCurso when args is Usuario => CrearCursoScreen(
+        usuario: args,
         cursoRepository: cursoRepository,
       ),
-
+      crearCurso => _RutaNoEncontrada(nombre: settings.name),
       detalleCurso => DetalleCursoScreen(
         grupoId: args is String ? args : '',
         cursoRepository: cursoRepository,
       ),
-      homeEstudiante => HomeEstudianteScreen(
-        usuario: args as Usuario,
+      editarCurso when args is Curso => EditarCursoScreen(
+        curso: args,
+        editarCurso: EditarCurso(cursoRepository),
+      ),
+      editarCurso => _RutaNoEncontrada(nombre: settings.name),
+      homeEstudiante when args is Usuario => HomeEstudianteScreen(
+        usuario: args,
         cerrarSesion: CerrarSesion(authRepository),
       ),
+      homeEstudiante => _RutaNoEncontrada(nombre: settings.name),
       _ => _RutaNoEncontrada(nombre: settings.name),
     };
 
