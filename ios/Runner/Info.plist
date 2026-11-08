@@ -2,8 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
+		<!-- GPS: ubicación para fijar el lugar del curso y validar la asistencia -->
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Ceiba usa tu ubicación para fijar el lugar del curso y validar la asistencia.</string>
+
+		<!-- Cámara para escanear el código QR de asistencia -->
+		<key>NSCameraUsageDescription</key>
+		<string>Ceiba usa la cámara para escanear el código QR de asistencia.</string>
 
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true />

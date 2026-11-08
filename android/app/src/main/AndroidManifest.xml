@@ -1,9 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Ubicación para fijar el lugar del curso y validar asistencia -->
+    <!-- GPS: ubicación para fijar el lugar del curso y validar asistencia -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Internet para Firebase y los mapas de OpenStreetMap -->
+
+    <!-- Cámara para escanear el código QR de asistencia -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Internet y Wi-Fi para Firebase y los mapas de OpenStreetMap -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- Hardware que usa la app; required="false" deja instalarla aunque
+         el dispositivo no lo tenga (la app pide el permiso cuando lo necesita) -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.location.network" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
 
     <application
         android:label="ceiba"

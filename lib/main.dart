@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'FireBase/firebase_options.dart';
+import 'data/datasources/asistencia_datasource.dart';
 import 'data/datasources/auth_datasource.dart';
 import 'data/datasources/curso_datasource.dart';
 import 'data/datasources/inscripcion_datasource.dart';
 import 'data/datasources/lista_estudiantes_datasource.dart';
 import 'data/datasources/ubicacion_datasource.dart';
+import 'data/repositories/asistencia_repository_impl.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'data/repositories/curso_repository_impl.dart';
 import 'data/repositories/inscripcion_repository_impl.dart';
@@ -36,10 +38,15 @@ class CeibaApp extends StatelessWidget {
     final inscripcionRepository = InscripcionRepositoryImpl(
       InscripcionDatasource(),
     );
+    final asistenciaRepository = AsistenciaRepositoryImpl(
+      datasource: AsistenciaDatasource(),
+      ubicacionDatasource: UbicacionDatasource(),
+    );
     final rutas = AppRoutes(
       authRepository: authRepository,
       cursoRepository: cursoRepository,
       inscripcionRepository: inscripcionRepository,
+      asistenciaRepository: asistenciaRepository,
     );
 
     return MaterialApp(
