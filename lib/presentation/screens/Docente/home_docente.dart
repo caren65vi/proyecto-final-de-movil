@@ -193,7 +193,15 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
                   )
                 else
                   for (final curso in cursos) ...[
-                    _TarjetaCurso(curso: curso),
+                    _TarjetaCurso(
+                      curso: curso,
+                      // "Gestionar Clase" abre el detalle del curso
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.detalleCurso,
+                        arguments: curso.id,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                   ],
               ],

@@ -18,6 +18,12 @@ abstract class CursoRepository {
   /// Cursos del docente; emite una lista nueva cada vez que cambian.
   Stream<List<Curso>> misCursos(String docenteUid);
 
+  /// Un curso por su ID, en tiempo real.
+  Stream<Curso> curso(String grupoId);
+
+  /// Estudiantes inscritos en el curso, en tiempo real.
+  Stream<List<EstudianteInscrito>> estudiantes(String grupoId);
+
   /// Ubicación actual del celular (pide permiso si hace falta).
   Future<({double latitud, double longitud})> obtenerUbicacionActual();
 
@@ -25,4 +31,6 @@ abstract class CursoRepository {
   /// Devuelve null si el docente cancela.
   Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
   importarEstudiantes();
+
+
 }

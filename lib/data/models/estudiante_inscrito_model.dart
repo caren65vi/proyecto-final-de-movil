@@ -14,4 +14,21 @@ class EstudianteInscritoModel {
     'horasJustificadas': 0,
     'fechaInscripcion': FieldValue.serverTimestamp(),
   };
+
+ /// Convierte un documento de inscripciones/{correo} en la entidad.
+  static EstudianteInscrito fromDocument(
+    DocumentSnapshot<Map<String, dynamic>> document,
+  ) {
+    final data = document.data()!;
+    return EstudianteInscrito(
+      correo: document.id,
+      nombre: data['nombre'] as String? ?? '',
+      codigoEstudiante: data['codigoEstudiante'] as String?,
+      uid: data['uid'] as String?,
+      horasAsistidas: (data['horasAsistidas'] as num? ?? 0).toDouble(),
+      horasFalta: (data['horasFalta'] as num? ?? 0).toDouble(),
+      horasJustificadas: (data['horasJustificadas'] as num? ?? 0).toDouble(),
+    );
+  }
+
 }

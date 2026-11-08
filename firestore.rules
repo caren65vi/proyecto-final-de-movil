@@ -124,13 +124,14 @@ service cloud.firestore {
                     && request.resource.data.totalJustificadas == 0;
 
       // El dueño edita los datos del curso; los contadores los lleva el servidor
-      allow update: if esDueno(grupoId)
+       allow update: if esDueno(grupoId)
                     && soloCambia([
                          'nombreMateria', 'facultad', 'numeroGrupo', 'aula',
                          'docenteNombre', 'periodoId', 'fechaInicio', 'fechaFin',
                          'horasTotales', 'metaAsistencia', 'horario',
-                         'ubicacion', 'radioMetros'
+                         'ubicacion', 'radioMetros', 'totalEstudiantes'
                        ]);
+
 
       allow delete: if esDueno(grupoId);
 

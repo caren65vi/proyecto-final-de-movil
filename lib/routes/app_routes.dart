@@ -12,7 +12,7 @@ import '../presentation/screens/auth/login_screen.dart';
 import '../presentation/screens/auth/recover_password_screen.dart';
 import '../presentation/screens/auth/register_screen.dart';
 import '../presentation/screens/auth/verify_email_screen.dart';
-
+import '../presentation/screens/Docente/detalle_curso.dart';
 /// Rutas de la aplicación.
 ///
 /// Aquí están los nombres de todas las pantallas y cómo se construyen:
@@ -46,6 +46,9 @@ class AppRoutes {
   /// Argumento: `Usuario` que inició sesión.
   static const String homeEstudiante = '/estudiante';
 
+  /// Argumento: `String` con el ID del grupo y `CursoRepository`.
+  static const String detalleCurso = '/docente/detalle-curso';
+
   // ---------- Construcción de las pantallas ----------
 
   /// Se usa en `MaterialApp.onGenerateRoute`.
@@ -74,6 +77,11 @@ class AppRoutes {
       ),
       crearCurso => CrearCursoScreen(
         usuario: args as Usuario,
+        cursoRepository: cursoRepository,
+      ),
+
+      detalleCurso => DetalleCursoScreen(
+        grupoId: args is String ? args : '',
         cursoRepository: cursoRepository,
       ),
       homeEstudiante => HomeEstudianteScreen(

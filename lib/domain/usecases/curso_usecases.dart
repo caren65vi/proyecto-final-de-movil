@@ -56,3 +56,19 @@ class ImportarEstudiantes {
     return resultado;
   }
 }
+
+
+class ObtenerCurso {
+  final CursoRepository repositorio;
+  ObtenerCurso(this.repositorio);
+
+  Stream<Curso> call(String grupoId) => repositorio.curso(grupoId);
+}
+
+class ObtenerEstudiantes {
+  final CursoRepository repositorio;
+  ObtenerEstudiantes(this.repositorio);
+
+  Stream<List<EstudianteInscrito>> call(String grupoId) =>
+      repositorio.estudiantes(grupoId);
+}
