@@ -8,7 +8,7 @@ import '../../theme/app_colors.dart';
 class HorarioEstudiante extends StatefulWidget {
   const HorarioEstudiante({super.key, required this.materias});
 
-  final List<MateriaEstudiante> materias;
+  final Stream<List<MateriaEstudiante>> materias;
 
   @override
   State<HorarioEstudiante> createState() => _HorarioEstudianteState();
@@ -61,22 +61,8 @@ class _HorarioEstudianteState extends State<HorarioEstudiante> {
   String _fechaLarga(DateTime d) =>
       '${_diasLargos[d.weekday - 1]}, ${d.day} de ${_meses[d.month - 1]}';
 
-  // Clases del día seleccionado, ordenadas por hora de inicio
-  List<({MateriaEstudiante materia, BloqueHorario bloque})> get _clasesDelDia {
-    final clases = [
-      for (final materia in widget.materias)
-        for (final bloque in materia.curso.horario)
-          if (bloque.dia == _diaSeleccionado.weekday)
-            (materia: materia, bloque: bloque),
-    ];
-    clases.sort((a, b) => a.bloque.inicio.compareTo(b.bloque.inicio));
-    return clases;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final clases = _clasesDelDia;
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
@@ -123,25 +109,56 @@ class _HorarioEstudianteState extends State<HorarioEstudiante> {
 
         const SizedBox(height: 12),
 
-        if (clases.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 32),
-            child: Column(
-              children: [
-                Icon(Icons.event_available, size: 40, color: AppColors.outline),
-                SizedBox(height: 8),
-                Text(
-                  'No tienes clases este día',
-                  style: TextStyle(color: AppColors.textSecondary),
+        StreamBuilder<List<MateriaEstudiante>>(
+          stream: widget.materias,
+          builder: (context, snap) {
+            if (snap.hasError) {
+              return Text(
+                '${snap.error}',
+                style: const TextStyle(color: AppColors.error),
+              );
+            }
+            if (!snap.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final clases = [
+              for (final materia in snap.data!)
+                for (final bloque in materia.curso.horario)
+                  if (bloque.dia == _diaSeleccionado.weekday)
+                    (materia: materia, bloque: bloque),
+            ]..sort((a, b) => a.bloque.inicio.compareTo(b.bloque.inicio));
+
+            if (clases.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.only(top: 32),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.event_available,
+                      size: 40,
+                      color: AppColors.outline,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'No tienes clases este día',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ],
                 ),
+              );
+            }
+
+            return Column(
+              children: [
+                for (final clase in clases) ...[
+                  _ClaseDelDia(materia: clase.materia, bloque: clase.bloque),
+                  const SizedBox(height: 10),
+                ],
               ],
-            ),
-          )
-        else
-          for (final clase in clases) ...[
-            _ClaseDelDia(materia: clase.materia, bloque: clase.bloque),
-            const SizedBox(height: 10),
-          ],
+            );
+          },
+        ),
       ],
     );
   }
