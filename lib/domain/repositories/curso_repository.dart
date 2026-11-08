@@ -24,6 +24,15 @@ abstract class CursoRepository {
   /// Estudiantes inscritos en el curso, en tiempo real.
   Stream<List<EstudianteInscrito>> estudiantes(String grupoId);
 
+  /// Guarda los cambios de un curso que ya existe.
+  Future<void> editarCurso(Curso curso);
+
+  /// Agrega un estudiante a la lista de clase.
+  Future<void> agregarEstudiante(String grupoId, EstudianteInscrito estudiante);
+
+  /// Quita un estudiante de la lista de clase.
+  Future<void> quitarEstudiante(String grupoId, String correo);
+
   /// Ubicación actual del celular (pide permiso si hace falta).
   Future<({double latitud, double longitud})> obtenerUbicacionActual();
 
@@ -31,6 +40,4 @@ abstract class CursoRepository {
   /// Devuelve null si el docente cancela.
   Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
   importarEstudiantes();
-
-
 }

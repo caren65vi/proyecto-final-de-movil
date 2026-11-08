@@ -60,6 +60,26 @@ class FakeCursoRepository implements CursoRepository {
   Stream<List<Curso>> misCursos(String docenteUid) => Stream.value(const []);
 
   @override
+  Stream<Curso> curso(String grupoId) => throw UnimplementedError();
+
+  @override
+  Stream<List<EstudianteInscrito>> estudiantes(String grupoId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> editarCurso(Curso curso) => throw UnimplementedError();
+
+  @override
+  Future<void> agregarEstudiante(
+    String grupoId,
+    EstudianteInscrito estudiante,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<void> quitarEstudiante(String grupoId, String correo) =>
+      throw UnimplementedError();
+
+  @override
   Future<({double latitud, double longitud})> obtenerUbicacionActual() async =>
       (latitud: 1.619816, longitud: -75.604029);
 

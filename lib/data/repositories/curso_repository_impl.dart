@@ -77,4 +77,26 @@ class CursoRepositoryImpl implements CursoRepository {
       cursoDatasource
           .estudiantes(grupoId)
           .handleError((Object error) => throw _traducir(error));
+
+  Future<T> _ejecutar<T>(Future<T> Function() accion) async {
+    try {
+      return await accion();
+    } catch (error) {
+      throw _traducir(error);
+    }
+  }
+
+  @override
+  Future<void> editarCurso(Curso curso) =>
+      _ejecutar(() => cursoDatasource.editarCurso(curso));
+
+  @override
+  Future<void> agregarEstudiante(
+    String grupoId,
+    EstudianteInscrito estudiante,
+  ) => _ejecutar(() => cursoDatasource.agregarEstudiante(grupoId, estudiante));
+
+  @override
+  Future<void> quitarEstudiante(String grupoId, String correo) =>
+      _ejecutar(() => cursoDatasource.quitarEstudiante(grupoId, correo));
 }

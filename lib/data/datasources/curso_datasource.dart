@@ -2,15 +2,68 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../domain/entities/curso.dart';
 import '../../domain/entities/estudiante_inscrito.dart';
+import '../../domain/repositories/curso_repository.dart';
 import '../models/curso_model.dart';
 import '../models/estudiante_inscrito_model.dart';
 
 /// Habla directamente con Cloud Firestore (colección "grupos").
 class CursoDatasource {
+  static const _camposEditables = {
+    'nombreMateria',
+    'facultad',
+    'numeroGrupo',
+    'aula',
+    'docenteNombre',
+    'periodoId',
+    'fechaInicio',
+    'fechaFin',
+    'horasTotales',
+    'metaAsistencia',
+    'horario',
+    'ubicacion',
+    'radioMetros',
+  };
+
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _grupos =>
       _db.collection('grupos');
+
+  // Actualiza solo los campos editables; los contadores no se tocan.
+  Future<void> editarCurso(Curso curso) {
+    final datos = CursoModel.toMap(curso)
+      ..removeWhere((campo, _) => !_camposEditables.contains(campo));
+
+    return _grupos.doc(curso.id).update(datos);
+  }
+
+  // Crea la inscripción y suma 1 al total del curso en el mismo lote.
+  Future<void> agregarEstudiante(
+    String grupoId,
+    EstudianteInscrito estudiante,
+  ) async {
+    final grupo = _grupos.doc(grupoId);
+    final inscripcion = grupo
+        .collection('inscripciones')
+        .doc(estudiante.correo);
+    if ((await inscripcion.get()).exists) {
+      throw const CursoError('Ese estudiante ya está inscrito en el curso');
+    }
+
+    final lote = _db.batch();
+    lote.set(inscripcion, EstudianteInscritoModel.toMap(estudiante));
+    lote.update(grupo, {'totalEstudiantes': FieldValue.increment(1)});
+    await lote.commit();
+  }
+
+  // Borra la inscripción y resta 1 al total del curso en el mismo lote.
+  Future<void> quitarEstudiante(String grupoId, String correo) async {
+    final grupo = _grupos.doc(grupoId);
+    final lote = _db.batch();
+    lote.delete(grupo.collection('inscripciones').doc(correo));
+    lote.update(grupo, {'totalEstudiantes': FieldValue.increment(-1)});
+    await lote.commit();
+  }
 
   // Guarda el curso y luego su lista de estudiantes
   Future<String> crearCurso(
@@ -57,10 +110,11 @@ class CursoDatasource {
 
   //Lista de clase ordenada por nombre
 
-  Stream<List<EstudianteInscrito>> estudiantes(String grupoId) =>
-      _grupos.doc(grupoId).collection('inscripciones').snapshots().map((
-        snapshot,
-      ) {
+  Stream<List<EstudianteInscrito>> estudiantes(String grupoId) => _grupos
+      .doc(grupoId)
+      .collection('inscripciones')
+      .snapshots()
+      .map((snapshot) {
         final lista = snapshot.docs
             .map(EstudianteInscritoModel.fromDocument)
             .toList();
