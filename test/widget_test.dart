@@ -3,9 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ceiba/domain/entities/curso.dart';
 import 'package:ceiba/domain/entities/estudiante_inscrito.dart';
+import 'package:ceiba/domain/entities/materia_estudiante.dart';
 import 'package:ceiba/domain/entities/usuario.dart';
 import 'package:ceiba/domain/repositories/auth_repository.dart';
 import 'package:ceiba/domain/repositories/curso_repository.dart';
+import 'package:ceiba/domain/repositories/inscripcion_repository.dart';
 import 'package:ceiba/routes/app_routes.dart';
 
 /// Repositorio falso: permite probar la pantalla sin conectarse a Firebase.
@@ -88,10 +90,20 @@ class FakeCursoRepository implements CursoRepository {
   importarEstudiantes() async => null;
 }
 
+class FakeInscripcionRepository implements InscripcionRepository {
+  @override
+  Stream<List<MateriaEstudiante>> misMaterias(String correo) =>
+      Stream.value(const []);
+
+  @override
+  Future<void> enlazarCuenta(String correo, String uid) async {}
+}
+
 Future<void> abrirLogin(WidgetTester tester) {
   final rutas = AppRoutes(
     authRepository: FakeAuthRepository(),
     cursoRepository: FakeCursoRepository(),
+    inscripcionRepository: FakeInscripcionRepository(),
   );
   return tester.pumpWidget(
     MaterialApp(
