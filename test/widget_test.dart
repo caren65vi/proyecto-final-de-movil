@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ceiba/domain/entities/asistencia.dart';
 import 'package:ceiba/domain/entities/curso.dart';
 import 'package:ceiba/domain/entities/estudiante_inscrito.dart';
 import 'package:ceiba/domain/entities/materia_estudiante.dart';
 import 'package:ceiba/domain/entities/usuario.dart';
+import 'package:ceiba/domain/repositories/asistencia_repository.dart';
 import 'package:ceiba/domain/repositories/auth_repository.dart';
 import 'package:ceiba/domain/repositories/curso_repository.dart';
 import 'package:ceiba/domain/repositories/inscripcion_repository.dart';
@@ -99,11 +101,40 @@ class FakeInscripcionRepository implements InscripcionRepository {
   Future<void> enlazarCuenta(String correo, String uid) async {}
 }
 
+class FakeAsistenciaRepository implements AsistenciaRepository {
+  @override
+  Future<({String sesionId, String token})> abrirSesion(String grupoId) async =>
+      (sesionId: 'sesion-prueba', token: 'token-prueba');
+
+  @override
+  Future<String> renovarQR(String grupoId, String sesionId) async =>
+      'token-nuevo';
+
+  @override
+  Future<void> cerrarSesion(String grupoId, String sesionId) async {}
+
+  @override
+  Future<void> registrarAsistencia({
+    required String grupoId,
+    required String sesionId,
+    required String token,
+  }) async {}
+
+  @override
+  Stream<List<Asistencia>> asistencias(String grupoId, String sesionId) =>
+      Stream.value(const []);
+
+  @override
+  Stream<String> tokenQR(String grupoId, String sesionId) =>
+      Stream.value('token-prueba');
+}
+
 Future<void> abrirLogin(WidgetTester tester) {
   final rutas = AppRoutes(
     authRepository: FakeAuthRepository(),
     cursoRepository: FakeCursoRepository(),
     inscripcionRepository: FakeInscripcionRepository(),
+    asistenciaRepository: FakeAsistenciaRepository(),
   );
   return tester.pumpWidget(
     MaterialApp(

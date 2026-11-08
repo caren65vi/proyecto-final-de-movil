@@ -51,9 +51,14 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
         .showSnackBar(SnackBar(content: Text(mensaje)));
   }
 
-  // La toma de asistencia (QR) todavía no está construida
-  void _iniciarClase() =>
-      _mostrar('La toma de asistencia estará disponible pronto');
+  Future<void> _iniciarClase(Curso curso) async {
+    final inicio = await Navigator.pushNamed<bool>(
+      context,
+      AppRoutes.asistenciaQR,
+      arguments: curso,
+    );
+    if (inicio == true) _mostrar('Sesión de asistencia cerrada');
+  }
 
   Future<void> _mostrarAgregar() async {
     final correo = TextEditingController();
@@ -267,7 +272,7 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
             sesion: sesiones[i],
             aula: curso.aula,
             esProxima: i == indiceProxima,
-            onIniciar: _iniciarClase,
+            onIniciar: () => _iniciarClase(curso),
           ),
           const SizedBox(height: 12),
         ],

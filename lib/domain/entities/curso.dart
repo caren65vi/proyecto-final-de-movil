@@ -17,6 +17,10 @@ class Curso {
   final int radioMetros;
   final double metaAsistencia; // 0.8 = 80 %
   final int totalEstudiantes;
+  final int sesionesCerradas;
+  final int totalPresentes;
+  final int totalAusentes;
+  final int totalJustificadas;
 
   const Curso({
     this.id,
@@ -33,7 +37,11 @@ class Curso {
     required this.longitud,
     required this.radioMetros,
     this.metaAsistencia = 0.8,
-    this.totalEstudiantes= 0,
+    this.totalEstudiantes = 0,
+    this.sesionesCerradas = 0,
+    this.totalPresentes = 0,
+    this.totalAusentes = 0,
+    this.totalJustificadas = 0,
   });
 
   // Semestre según el mes de inicio: "2026-1" (ene–jun) o "2026-2" (jul–dic)
@@ -52,5 +60,35 @@ class Curso {
       dia = DateTime(dia.year, dia.month, dia.day + 1);
     }
     return total.round();
+  }
+
+  int get totalRegistros => totalPresentes + totalAusentes + totalJustificadas;
+
+  ///asistencias del curso
+  double get porcentajeAsistencia => totalRegistros == 0
+      ? 0
+      : totalPresentes * totalJustificadas / totalRegistros;
+
+
+      //promedio por clase 
+
+  /// Bloque del horario que está en curso en [momento] (por defecto, ahora).
+  /// Cuenta desde 15 minutos antes del inicio, igual que el servidor.
+  BloqueHorario? bloqueEnCurso([DateTime? momento]) {
+    final ahora = momento ?? DateTime.now();
+    final minutos = ahora.hour * 60 + ahora.minute;
+    int aMinutos(String hora) {
+      final partes = hora.split(':');
+      return int.parse(partes[0]) * 60 + int.parse(partes[1]);
+    }
+
+    for (final bloque in horario) {
+      if (bloque.dia == ahora.weekday &&
+          minutos >= aMinutos(bloque.inicio) - 15 &&
+          minutos <= aMinutos(bloque.fin)) {
+        return bloque;
+      }
+    }
+    return null;
   }
 }

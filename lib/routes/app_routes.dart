@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/entities/usuario.dart';
+import '../domain/repositories/asistencia_repository.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/curso_repository.dart';
 import '../domain/repositories/inscripcion_repository.dart';
@@ -16,6 +17,8 @@ import '../presentation/screens/auth/register_screen.dart';
 import '../presentation/screens/auth/verify_email_screen.dart';
 import '../presentation/screens/Docente/detalle_curso.dart';
 import '../presentation/screens/Docente/editar_curso.dart';
+import '../presentation/screens/Docente/asistencia_qr.dart';
+import '../presentation/screens/Estudiante/escanear_qr.dart';
 import '../domain/entities/curso.dart';
 
 /// Rutas de la aplicación.
@@ -28,11 +31,13 @@ class AppRoutes {
     required this.authRepository,
     required this.cursoRepository,
     required this.inscripcionRepository,
+    required this.asistenciaRepository,
   });
 
   final AuthRepository authRepository;
   final CursoRepository cursoRepository;
   final InscripcionRepository inscripcionRepository;
+  final AsistenciaRepository asistenciaRepository;
 
   // ---------- Nombres de las rutas ----------
 
@@ -61,6 +66,12 @@ class AppRoutes {
 
   ///argumento : para editar del curso
   static const String editarCurso = '/docente/editar-curso';
+
+  /// Argumento: el `Curso` del que se toma asistencia.
+  static const String asistenciaQR = '/docente/asistencia';
+
+  /// Argumento opcional: `List<Curso>` del estudiante (para la clase en curso).
+  static const String escanearQR = '/estudiante/escanear';
 
   // ---------- Construcción de las pantallas ----------
 
@@ -98,6 +109,16 @@ class AppRoutes {
       detalleCurso => DetalleCursoScreen(
         grupoId: args is String ? args : '',
         cursoRepository: cursoRepository,
+      ),
+      asistenciaQR when args is Curso => AsistenciaQrScreen(
+        curso: args,
+        asistenciaRepository: asistenciaRepository,
+        cursoRepository: cursoRepository,
+      ),
+      asistenciaQR => _RutaNoEncontrada(nombre: settings.name),
+      escanearQR => EscanearQrScreen(
+        asistenciaRepository: asistenciaRepository,
+        cursos: args is List<Curso> ? args : const [],
       ),
       editarCurso when args is Curso => EditarCursoScreen(
         curso: args,

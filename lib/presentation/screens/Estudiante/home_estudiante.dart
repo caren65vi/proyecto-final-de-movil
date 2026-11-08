@@ -6,6 +6,7 @@ import '../../../domain/entities/materia_estudiante.dart';
 import '../../../domain/entities/usuario.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../../domain/usecases/inscripcion_usecases.dart';
+import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
 import 'asistencia_estudiante.dart';
 import 'horario_estudiante.dart';
@@ -115,6 +116,13 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
     }).toList();
   }
 
+  // Abre el escáner con los cursos para mostrar la clase en curso
+  void _abrirEscaner() => Navigator.pushNamed(
+    context,
+    AppRoutes.escanearQR,
+    arguments: [for (final m in _materias) m.curso],
+  );
+
   @override
   void dispose() {
     _suscripcion?.cancel();
@@ -199,12 +207,21 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
           children: [
             _buildCursos(),
             HorarioEstudiante(materias: _materiasStream),
-            const AsistenciaEstudiante(),
+            AsistenciaEstudiante(
+              onEscanear: _abrirEscaner,
+            ),
             PerfilEstudiante(
               usuario: widget.usuario,
               onCerrarSesion: _cerrarSesion,
             ),
           ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _abrirEscaner,
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.qr_code_scanner),
+          label: const Text('Escanear'),
         ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _pestana,
