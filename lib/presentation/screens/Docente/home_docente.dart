@@ -214,7 +214,8 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
 
   Future<void> _abrirCrearCurso() async {
     // CrearCursoScreen devuelve true al guardar
-    final creado = await Navigator.pushNamed<bool>(
+    // Sin <bool>: generarRuta crea MaterialPageRoute<dynamic> y el cast fallaría
+    final creado = await Navigator.pushNamed(
       context,
       AppRoutes.crearCurso,
       arguments: widget.usuario,
