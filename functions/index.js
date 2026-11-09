@@ -1,4 +1,4 @@
-const {setGlobalOptions} = require("firebase-functions");
+const {setGlobalOptions, logger} = require("firebase-functions");
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const {initializeApp} = require("firebase-admin/app");
@@ -384,8 +384,23 @@ exports.cerrarSesion = onCall(async (request) => {
   const datos = request.data || {};
   const grupo = await grupoDelDocente(datos.grupoId, auth.uid);
   const sesion = await sesionAbierta(grupo.ref, datos.sesionId);
-  const horas = sesion.datos.horas;
 
+  // 1. Primero se cierra la sesión (transacción). registrarAsistenciaQR
+  // también lee la sesión en su transacción, así que después de esto
+  // ningún estudiante puede registrarse y las cuentas no cambian.
+  const horas = await db.runTransaction(async (t) => {
+    const actual = await t.get(sesion.ref);
+    if (!actual.exists || actual.get("estado") !== "abierta") {
+      throw new HttpsError("failed-precondition", "La asistencia ya se cerró");
+    }
+    t.update(sesion.ref, {
+      estado: "cerrada",
+      cerradaEn: FieldValue.serverTimestamp(),
+    });
+    return actual.get("horas");
+  });
+
+  // 2. Con la sesión ya cerrada se leen las asistencias definitivas
   const [inscripciones, asistencias] = await Promise.all([
     grupo.ref.collection("inscripciones").get(),
     sesion.ref.collection("asistencias").get(),
@@ -398,12 +413,22 @@ exports.cerrarSesion = onCall(async (request) => {
   const conteo = {presente: 0, ausente: 0, justificada: 0};
   const escritor = db.bulkWriter(); // agrupa muchas escrituras
 
+  // bulkWriter no lanza error si falla una escritura: se anotan aquí
+  const fallas = [];
+  const pendientes = [];
+  const vigilar = (escritura, ruta) => {
+    pendientes.push(
+        escritura.catch((error) => fallas.push({ruta, error: error.message})),
+    );
+  };
+
   inscripciones.forEach((doc) => {
     let estado = estados[doc.id];
     if (!CAMPO_HORAS[estado]) {
       // No escaneó: queda ausente
       estado = "ausente";
-      escritor.create(sesion.ref.collection("asistencias").doc(doc.id), {
+      const ref = sesion.ref.collection("asistencias").doc(doc.id);
+      vigilar(escritor.set(ref, {
         correo: doc.id,
         nombre: doc.get("nombre") || "",
         grupoId: datos.grupoId,
@@ -412,28 +437,40 @@ exports.cerrarSesion = onCall(async (request) => {
         horas,
         metodo: "automatico",
         registradaEn: FieldValue.serverTimestamp(),
-      });
+      }), ref.path);
     }
     conteo[estado] += 1;
-    escritor.update(doc.ref, {
+    vigilar(escritor.update(doc.ref, {
       [CAMPO_HORAS[estado]]: FieldValue.increment(horas),
-    });
+    }), doc.ref.path);
   });
 
-  escritor.update(sesion.ref, {
-    estado: "cerrada",
-    cerradaEn: FieldValue.serverTimestamp(),
+  // 3. Totales de la sesión y del curso
+  vigilar(escritor.update(sesion.ref, {
     presentes: conteo.presente,
     ausentes: conteo.ausente,
     justificadas: conteo.justificada,
-  });
-  escritor.update(grupo.ref, {
+  }), sesion.ref.path);
+  vigilar(escritor.update(grupo.ref, {
     sesionesCerradas: FieldValue.increment(1),
     totalPresentes: FieldValue.increment(conteo.presente),
     totalAusentes: FieldValue.increment(conteo.ausente),
     totalJustificadas: FieldValue.increment(conteo.justificada),
-  });
+  }), grupo.ref.path);
   await escritor.close();
+  await Promise.all(pendientes);
+
+  if (fallas.length > 0) {
+    logger.error("cerrarSesion: escrituras fallidas", {
+      grupoId: datos.grupoId,
+      sesionId: datos.sesionId,
+      fallas,
+    });
+    throw new HttpsError(
+        "internal",
+        "La sesión se cerró, pero algunos registros no se guardaron",
+    );
+  }
   return conteo;
 });
 
