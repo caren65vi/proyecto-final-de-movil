@@ -52,7 +52,8 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
   }
 
   Future<void> _iniciarClase(Curso curso) async {
-    final inicio = await Navigator.pushNamed<bool>(
+    // Sin <bool>: generarRuta crea MaterialPageRoute<dynamic> y el cast fallaría
+    final inicio = await Navigator.pushNamed(
       context,
       AppRoutes.asistenciaQR,
       arguments: curso,
