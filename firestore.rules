@@ -69,11 +69,14 @@ service cloud.firestore {
                   && (request.auth.uid == uid || rolActual() == 'docente');
 
       // Cada usuario edita su nombre y su código, nunca su rol;
-      // el docente edita o elimina, y solo a estudiantes
+      // el docente edita (nombre y código, nunca el rol) o elimina,
+      // y solo a estudiantes
       allow update: if (autenticado()
                         && request.auth.uid == uid
                         && soloCambia(['nombre', 'codigoEstudiante']))
-                    || (esDocente() && resource.data.rol == 'estudiante');
+                    || (esDocente()
+                        && resource.data.rol == 'estudiante'
+                        && soloCambia(['nombre', 'codigoEstudiante']));
 
       allow delete: if esDocente() && resource.data.rol == 'estudiante';
     }
