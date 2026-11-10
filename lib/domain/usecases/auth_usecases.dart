@@ -37,30 +37,36 @@ class RegistrarUsuario {
     if (rol != 'docente' && rol != 'estudiante') {
       throw const AuthError('Selecciona si eres docente o estudiante');
     }
-    final usuario = await repositorio.registrar(
+    // La cuenta queda creada pero no podrá entrar hasta verificar el correo
+    // (la pantalla de verificación envía el código al abrirse)
+    return repositorio.registrar(
       nombre: nombre.trim(),
       correo: correo.trim().toLowerCase(),
       contrasena: contrasena,
       rol: rol,
     );
-    // La cuenta queda creada pero no podrá entrar hasta abrir este enlace
-    await repositorio.enviarCorreoVerificacion();
-    return usuario;
   }
 }
 
-class EnviarCorreoVerificacion {
+/// Envía el código al correo. Devuelve los segundos para poder pedir otro.
+class EnviarCodigoVerificacion {
   final AuthRepository repositorio;
-  EnviarCorreoVerificacion(this.repositorio);
+  EnviarCodigoVerificacion(this.repositorio);
 
-  Future<void> call() => repositorio.enviarCorreoVerificacion();
+  Future<int> call() => repositorio.enviarCodigoVerificacion();
 }
 
-class ComprobarCorreoVerificado {
+class VerificarCodigo {
   final AuthRepository repositorio;
-  ComprobarCorreoVerificado(this.repositorio);
+  VerificarCodigo(this.repositorio);
 
-  Future<bool> call() => repositorio.correoVerificado();
+  Future<void> call(String codigo) async {
+    final limpio = codigo.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(limpio)) {
+      throw const AuthError('Escribe los 6 dígitos del código');
+    }
+    return repositorio.verificarCodigo(limpio);
+  }
 }
 
 class ObtenerUsuarioActual {
@@ -68,6 +74,23 @@ class ObtenerUsuarioActual {
   ObtenerUsuarioActual(this.repositorio);
 
   Future<Usuario?> call() => repositorio.obtenerUsuarioActual();
+}
+
+/// Al abrir la app: devuelve el usuario si ya tenía sesión abierta y su
+/// correo está verificado. Si no, cierra la sesión y devuelve null.
+class RestaurarSesion {
+  final AuthRepository repositorio;
+  RestaurarSesion(this.repositorio);
+
+  Future<Usuario?> call() async {
+    final usuario = await repositorio.obtenerUsuarioActual();
+    if (usuario == null) return null;
+    if (!await repositorio.correoVerificado()) {
+      await repositorio.cerrarSesion();
+      return null;
+    }
+    return usuario;
+  }
 }
 
 class RecuperarContrasena {

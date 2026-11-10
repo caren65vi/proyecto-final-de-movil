@@ -57,7 +57,11 @@ class CeibaApp extends StatelessWidget {
       locale: const Locale('es'),
       supportedLocales: const [Locale('es')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      initialRoute: AppRoutes.login,
+      // Solo la pantalla de carga (con initialRoute Flutter apilaría
+      // también '/' debajo); ella decide si sigue al login o al inicio.
+      onGenerateInitialRoutes: (_) => [
+        rutas.generarRuta(const RouteSettings(name: AppRoutes.carga)),
+      ],
       onGenerateRoute: rutas.generarRuta,
     );
   }

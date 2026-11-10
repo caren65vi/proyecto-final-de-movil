@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../domain/entities/usuario.dart';
@@ -69,6 +70,14 @@ class AuthRepositoryImpl implements AuthRepository {
       return await accion();
     } on FirebaseAuthException catch (e) {
       throw AuthError(_mensaje(e.code));
+    } on FirebaseFunctionsException catch (e) {
+      // Las funciones ya responden con mensajes en español; los errores
+      // internos llegan solo con el código en mayúsculas ("INTERNAL")
+      final mensaje = e.message;
+      if (mensaje == null || mensaje == mensaje.toUpperCase()) {
+        throw AuthError('Error de conexión con el servidor (${e.code})');
+      }
+      throw AuthError(mensaje);
     } on FirebaseException catch (e) {
       if (e.code == 'permission-denied') {
         throw const AuthError('No tienes permiso para realizar esta acción');
@@ -83,8 +92,13 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<void> enviarCorreoVerificacion() {
-    return _traducirErrores(datasource.enviarCorreoVerificacion);
+  Future<int> enviarCodigoVerificacion() {
+    return _traducirErrores(datasource.enviarCodigoVerificacion);
+  }
+
+  @override
+  Future<void> verificarCodigo(String codigo) {
+    return _traducirErrores(() => datasource.verificarCodigo(codigo));
   }
 
   @override

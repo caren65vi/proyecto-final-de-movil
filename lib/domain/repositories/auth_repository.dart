@@ -9,11 +9,11 @@ class AuthError implements Exception {
   String toString() => mensaje;
 }
 
-/// La contraseña es correcta pero el usuario no ha abierto el enlace de verificación.
-/// La sesión queda abierta para poder reenviar el correo.
+/// La contraseña es correcta pero el usuario no ha verificado su correo.
+/// La sesión queda abierta para poder enviarle el código.
 class CorreoNoVerificadoError extends AuthError {
   const CorreoNoVerificadoError()
-      : super('Debes verificar tu correo antes de iniciar sesión');
+    : super('Debes verificar tu correo antes de iniciar sesión');
 }
 
 /// Contrato: qué operaciones de autenticación existen (no dice cómo se hacen).
@@ -29,7 +29,12 @@ abstract class AuthRepository {
 
   Future<void> recuperarContrasena(String correo);
 
-  Future<void> enviarCorreoVerificacion();
+  /// Envía un código de 6 dígitos al correo del usuario con sesión abierta.
+  /// Devuelve los segundos que faltan para poder pedir otro.
+  Future<int> enviarCodigoVerificacion();
+
+  /// Comprueba el código; si es correcto el correo queda verificado.
+  Future<void> verificarCodigo(String codigo);
 
   Future<bool> correoVerificado();
 

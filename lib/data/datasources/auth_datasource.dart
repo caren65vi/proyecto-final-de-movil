@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/usuario_model.dart';
@@ -7,6 +8,7 @@ import '../models/usuario_model.dart';
 class AuthDatasource {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   CollectionReference<Map<String, dynamic>> get _usuarios =>
       _db.collection('usuarios');
@@ -64,19 +66,30 @@ class AuthDatasource {
     return UsuarioModel.fromFirestore(doc);
   }
 
-//firebase envia un correo de recuperación de contraseña al correo del usuario
+  //firebase envia un correo de recuperación de contraseña al correo del usuario
   Future<void> enviarCorreoRecuperacion(String correo) async {
     await _auth.setLanguageCode('es'); // el correo llega en español
     await _auth.sendPasswordResetEmail(email: correo);
   }
 
-  // Firebase envía un enlace de verificación al correo del usuario con sesión abierta
-  Future<void> enviarCorreoVerificacion() async {
-    await _auth.setLanguageCode('es'); // el correo llega en español
-    await _auth.currentUser!.sendEmailVerification();
+  // La Cloud Function envía el código de 6 dígitos al correo.
+  // Devuelve los segundos que faltan para poder pedir otro.
+  Future<int> enviarCodigoVerificacion() async {
+    final r = await _functions
+        .httpsCallable('enviarCodigoVerificacion')
+        .call<Map<String, dynamic>>();
+    return (r.data['esperaSegundos'] as num?)?.toInt() ?? 0;
   }
 
-  // Recarga el usuario desde Firebase para saber si ya abrió el enlace
+  // La Cloud Function comprueba el código y marca el correo como verificado
+  Future<void> verificarCodigo(String codigo) async {
+    await _functions.httpsCallable('verificarCodigo').call({'codigo': codigo});
+    // Se recarga el usuario y su token para que las reglas vean el cambio
+    await _auth.currentUser?.reload();
+    await _auth.currentUser?.getIdToken(true);
+  }
+
+  // Recarga el usuario desde Firebase para saber si ya verificó su correo
   Future<bool> correoVerificado() async {
     final user = _auth.currentUser;
     if (user == null) return false;
