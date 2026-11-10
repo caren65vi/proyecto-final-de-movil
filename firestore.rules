@@ -134,7 +134,9 @@ service cloud.firestore {
     // ID = nombre sin tildes ni mayúsculas, así no se repiten.
 
     match /facultades/{facultadId} {
-      allow read: if autenticado();
+      // Lectura pública: el formulario de registro las muestra antes de
+      // que exista la cuenta (solo son nombres)
+      allow read: if true;
 
       allow create: if esDocente()
                     && request.resource.data.keys().hasOnly(['nombre', 'creadaPor', 'creadaEn'])
@@ -150,7 +152,7 @@ service cloud.firestore {
 
       // ----- programas de la facultad (ID = nombre sin tildes) -----
       match /programas/{programaId} {
-        allow read: if autenticado();
+        allow read: if true;
 
         allow create: if esDocente()
                       && exists(/databases/$(database)/documents/facultades/$(facultadId))

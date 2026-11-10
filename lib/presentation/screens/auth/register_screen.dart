@@ -1,16 +1,30 @@
 import 'package:flutter/material.dart';
 
+import '../../../domain/entities/facultad.dart';
+import '../../../domain/entities/programa.dart';
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
+import '../../../domain/usecases/facultad_usecases.dart';
 import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
 
 enum UserRole { student, teacher }
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key, required this.registrarUsuario});
+  const RegisterScreen({
+    super.key,
+    required this.registrarUsuario,
+    required this.obtenerFacultades,
+    required this.obtenerProgramas,
+    required this.asignarPrograma,
+  });
 
   final RegistrarUsuario registrarUsuario;
+
+  // El estudiante elige su facultad y su programa al registrarse
+  final ObtenerFacultades obtenerFacultades;
+  final ObtenerProgramas obtenerProgramas;
+  final AsignarProgramaEstudiante asignarPrograma;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -25,6 +39,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
 
   UserRole _selectedRole = UserRole.student;
+
+  // Facultad y programa (solo para estudiantes)
+  late final Stream<List<Facultad>> _facultades = widget.obtenerFacultades();
+  Stream<List<Programa>>? _programas;
+  List<Facultad> _listaFacultades = const [];
+  List<Programa> _listaProgramas = const [];
+  String? _facultadId;
+  String? _programaId;
+
+  void _elegirFacultad(String? id) {
+    setState(() {
+      _facultadId = id;
+      _programaId = null;
+      _listaProgramas = const [];
+      _programas = id == null ? null : widget.obtenerProgramas(id);
+    });
+  }
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -119,12 +150,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _loading = true);
     try {
       // Crea la cuenta en Firebase; la pantalla siguiente envía el código
-      await widget.registrarUsuario(
+      final usuario = await widget.registrarUsuario(
         nombre: _nameController.text,
         correo: _emailController.text,
         contrasena: _passwordController.text,
         rol: _selectedRole == UserRole.student ? 'estudiante' : 'docente',
       );
+
+      // La cuenta ya quedó con la sesión abierta: se guarda su programa.
+      // Si falla, la cuenta igual sirve y lo puede elegir en su Perfil.
+      if (_selectedRole == UserRole.student) {
+        final facultad = _listaFacultades
+            .where((f) => f.id == _facultadId)
+            .firstOrNull;
+        final programa = _listaProgramas
+            .where((p) => p.id == _programaId)
+            .firstOrNull;
+        if (facultad != null && programa != null) {
+          try {
+            await widget.asignarPrograma(
+              uid: usuario.uid,
+              facultad: facultad,
+              programa: programa,
+            );
+          } catch (_) {
+            _showError(
+              'Tu cuenta se creó, pero no se guardó el programa. '
+              'Elígelo luego en tu Perfil.',
+            );
+          }
+        }
+      }
       if (!mounted) return;
 
       // Reemplaza el registro: la cuenta ya existe y no debe volver al formulario
@@ -140,6 +196,80 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  // Dos listas enlazadas: la facultad y luego un programa de esa facultad
+  Widget _buildPrograma() {
+    return StreamBuilder<List<Facultad>>(
+      stream: _facultades,
+      builder: (context, snapFacultades) {
+        _listaFacultades = snapFacultades.data ?? const [];
+        final cargando =
+            snapFacultades.data == null && !snapFacultades.hasError;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _FieldLabel(label: 'Facultad'),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              initialValue: _facultadId,
+              isExpanded: true,
+              decoration: InputDecoration(
+                hintText: cargando
+                    ? 'Cargando facultades…'
+                    : (_listaFacultades.isEmpty
+                          ? 'Aún no hay facultades'
+                          : 'Selecciona tu facultad'),
+                prefixIcon: const Icon(Icons.apartment_outlined, size: 20),
+              ),
+              items: [
+                for (final f in _listaFacultades)
+                  DropdownMenuItem(value: f.id, child: Text(f.nombre)),
+              ],
+              onChanged: _loading ? null : _elegirFacultad,
+              validator: (v) => v == null ? 'Selecciona tu facultad' : null,
+            ),
+            const SizedBox(height: 16),
+            const _FieldLabel(label: 'Programa'),
+            const SizedBox(height: 6),
+            StreamBuilder<List<Programa>>(
+              stream: _programas,
+              builder: (context, snapProgramas) {
+                _listaProgramas = _facultadId == null
+                    ? const []
+                    : (snapProgramas.data ?? const []);
+                final sinProgramas =
+                    _facultadId != null &&
+                    snapProgramas.data != null &&
+                    _listaProgramas.isEmpty;
+                return DropdownButtonFormField<String>(
+                  // La key reinicia el campo al cambiar de facultad
+                  key: ValueKey('programa-$_facultadId'),
+                  initialValue: _programaId,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    hintText: _facultadId == null
+                        ? 'Primero elige la facultad'
+                        : (sinProgramas
+                              ? 'Esta facultad aún no tiene programas'
+                              : 'Selecciona tu programa'),
+                    prefixIcon: const Icon(Icons.school_outlined, size: 20),
+                  ),
+                  items: [
+                    for (final p in _listaProgramas)
+                      DropdownMenuItem(value: p.id, child: Text(p.nombre)),
+                  ],
+                  onChanged: _loading || _facultadId == null
+                      ? null
+                      : (v) => setState(() => _programaId = v),
+                  validator: (v) => v == null ? 'Selecciona tu programa' : null,
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showError(String message) {
@@ -322,6 +452,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     });
                   },
                 ),
+
+                // Facultad y programa: solo los estudiantes
+                if (_selectedRole == UserRole.student) ...[
+                  const SizedBox(height: 24),
+                  _buildPrograma(),
+                ],
 
                 const SizedBox(height: 24),
 

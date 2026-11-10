@@ -62,6 +62,10 @@ class FacultadRepositoryImpl implements FacultadRepository {
       _ejecutar(() => datasource.eliminarPrograma(facultadId, programaId));
 
   @override
+  Future<Map<String, String>> programasDeEstudiantes(List<String> uids) =>
+      _ejecutar(() => datasource.programasDeEstudiantes(uids));
+
+  @override
   Future<void> asignarProgramaEstudiante({
     required String uid,
     required Facultad facultad,

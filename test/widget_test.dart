@@ -196,6 +196,10 @@ class FakeFacultadRepository implements FacultadRepository {
   Future<void> eliminarPrograma(String facultadId, String programaId) async {}
 
   @override
+  Future<Map<String, String>> programasDeEstudiantes(List<String> uids) async =>
+      const {};
+
+  @override
   Future<void> asignarProgramaEstudiante({
     required String uid,
     required Facultad facultad,

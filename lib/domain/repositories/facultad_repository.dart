@@ -44,6 +44,10 @@ abstract class FacultadRepository {
   /// Elimina un programa (solo lo puede borrar quien lo creó).
   Future<void> eliminarPrograma(String facultadId, String programaId);
 
+  /// Programa de cada estudiante (uid → nombre del programa), para que el
+  /// docente lo vea en la lista del curso. Los que no tienen no aparecen.
+  Future<Map<String, String>> programasDeEstudiantes(List<String> uids);
+
   /// Guarda en usuarios/{uid} la facultad y el programa del estudiante.
   Future<void> asignarProgramaEstudiante({
     required String uid,

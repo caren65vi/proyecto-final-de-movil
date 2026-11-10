@@ -88,6 +88,31 @@ class FacultadDatasource {
   Future<void> eliminarPrograma(String facultadId, String programaId) =>
       _programas(facultadId).doc(programaId).delete();
 
+  // Firestore acepta hasta 30 valores en una consulta whereIn
+  static const _porConsulta = 30;
+
+  Future<Map<String, String>> programasDeEstudiantes(List<String> uids) async {
+    final unicos = uids.toSet().toList();
+    final resultado = <String, String>{};
+    for (var i = 0; i < unicos.length; i += _porConsulta) {
+      final lote = unicos.sublist(
+        i,
+        (i + _porConsulta).clamp(0, unicos.length),
+      );
+      final snap = await _db
+          .collection('usuarios')
+          .where(FieldPath.documentId, whereIn: lote)
+          .get();
+      for (final doc in snap.docs) {
+        final programa = doc.data()['programaNombre'] as String?;
+        if (programa != null && programa.isNotEmpty) {
+          resultado[doc.id] = programa;
+        }
+      }
+    }
+    return resultado;
+  }
+
   Future<void> asignarProgramaEstudiante({
     required String uid,
     required Facultad facultad,

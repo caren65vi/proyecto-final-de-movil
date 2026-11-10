@@ -105,6 +105,17 @@ class EliminarPrograma {
       repositorio.eliminarPrograma(facultadId, programaId);
 }
 
+/// Programa de cada estudiante (uid → nombre) para la lista del curso.
+class ObtenerProgramasDeEstudiantes {
+  final FacultadRepository repositorio;
+  ObtenerProgramasDeEstudiantes(this.repositorio);
+
+  Future<Map<String, String>> call(List<String> uids) async {
+    if (uids.isEmpty) return const {};
+    return repositorio.programasDeEstudiantes(uids);
+  }
+}
+
 /// El estudiante elige su facultad y su programa; el programa debe ser
 /// de esa facultad.
 class AsignarProgramaEstudiante {

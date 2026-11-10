@@ -6,6 +6,7 @@ import '../../../domain/entities/estudiante_inscrito.dart';
 import '../../../domain/entities/recuperacion.dart';
 import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/curso_usecases.dart';
+import '../../../domain/usecases/facultad_usecases.dart';
 import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
 import 'recuperaciones_curso.dart';
@@ -16,10 +17,14 @@ class DetalleCursoScreen extends StatefulWidget {
     super.key,
     required this.grupoId,
     required this.cursoRepository,
+    required this.obtenerProgramasDeEstudiantes,
   });
 
   final String grupoId;
   final CursoRepository cursoRepository;
+
+  /// Programa de cada alumno (se muestra debajo de su nombre)
+  final ObtenerProgramasDeEstudiantes obtenerProgramasDeEstudiantes;
 
   @override
   State<DetalleCursoScreen> createState() => _DetalleCursoScreenState();
@@ -54,6 +59,29 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
   late final _eliminarRecuperacion = EliminarRecuperacion(
     widget.cursoRepository,
   );
+
+  // Programa de cada alumno (uid → nombre). Se pide solo una vez por uid.
+  final Map<String, String> _programas = {};
+  final Set<String> _programasPedidos = {};
+
+  void _cargarProgramas(List<EstudianteInscrito> lista) {
+    final nuevos = [
+      for (final e in lista)
+        if (e.uid != null && _programasPedidos.add(e.uid!)) e.uid!,
+    ];
+    if (nuevos.isEmpty) return;
+    widget
+        .obtenerProgramasDeEstudiantes(nuevos)
+        .then((encontrados) {
+          if (mounted && encontrados.isNotEmpty) {
+            setState(() => _programas.addAll(encontrados));
+          }
+        })
+        .catchError((Object _) {
+          // Sin programa no pasa nada: la lista se ve igual
+          _programasPedidos.removeAll(nuevos);
+        });
+  }
 
   late final _agregar = AgregarEstudiante(widget.cursoRepository);
   late final _quitar = QuitarEstudiante(widget.cursoRepository);
@@ -311,6 +339,10 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
           stream: _estudiantes,
           builder: (context, snap) {
             final lista = snap.data ?? const <EstudianteInscrito>[];
+            // Pide el programa de los alumnos nuevos (fuera del build)
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => _cargarProgramas(lista),
+            );
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -399,6 +431,7 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
         _FilaEstudiante(
           estudiante: e,
           meta: curso.metaAsistencia,
+          programa: e.uid == null ? null : _programas[e.uid],
           onQuitar: () => _confirmarQuitar(e),
         ),
         const SizedBox(height: 8),
@@ -920,11 +953,15 @@ class _FilaEstudiante extends StatelessWidget {
     required this.estudiante,
     required this.meta,
     required this.onQuitar,
+    this.programa,
   });
 
   final EstudianteInscrito estudiante;
   final double meta;
   final VoidCallback onQuitar;
+
+  /// Programa académico del alumno (null si no lo ha elegido).
+  final String? programa;
 
   // Colores del círculo de iniciales (fondo, texto)
   static const _coloresAvatar = [
@@ -1020,6 +1057,28 @@ class _FilaEstudiante extends StatelessWidget {
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (programa != null)
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.school_outlined,
+                        size: 13,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          programa!,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),

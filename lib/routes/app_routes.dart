@@ -96,6 +96,9 @@ class AppRoutes {
       login => LoginScreen(iniciarSesion: IniciarSesion(authRepository)),
       registro => RegisterScreen(
         registrarUsuario: RegistrarUsuario(authRepository),
+        obtenerFacultades: ObtenerFacultades(facultadRepository),
+        obtenerProgramas: ObtenerProgramas(facultadRepository),
+        asignarPrograma: AsignarProgramaEstudiante(facultadRepository),
       ),
       recuperarContrasena => RecoverPasswordScreen(
         recuperarContrasena: RecuperarContrasena(authRepository),
@@ -135,6 +138,9 @@ class AppRoutes {
       detalleCurso => DetalleCursoScreen(
         grupoId: args is String ? args : '',
         cursoRepository: cursoRepository,
+        obtenerProgramasDeEstudiantes: ObtenerProgramasDeEstudiantes(
+          facultadRepository,
+        ),
       ),
       asistenciaQR when args is Curso => AsistenciaQrScreen(
         curso: args,
