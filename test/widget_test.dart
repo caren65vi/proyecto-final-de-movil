@@ -183,6 +183,7 @@ void main() {
       cursoRepository: FakeCursoRepository(),
       inscripcionRepository: FakeInscripcionRepository(),
       asistenciaRepository: FakeAsistenciaRepository(),
+      facultadRepository: FakeFacultadRepository(),
     );
     await tester.pumpWidget(
       MaterialApp(
@@ -210,6 +211,7 @@ void main() {
         cursoRepository: FakeCursoRepository(),
         inscripcionRepository: FakeInscripcionRepository(),
         asistenciaRepository: FakeAsistenciaRepository(),
+        facultadRepository: FakeFacultadRepository(),
       );
       // El login queda debajo, como cuando se llega desde el registro
       return tester.pumpWidget(
