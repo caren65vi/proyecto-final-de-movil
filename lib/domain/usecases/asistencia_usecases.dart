@@ -40,7 +40,13 @@ class ObtenerTendenciaSemanal {
   final AsistenciaRepository repositorio;
   ObtenerTendenciaSemanal(this.repositorio);
 
-  Stream<List<double?>> call(String grupoId, {int semanas = 4}) {
+  /// Semanas que se muestran en la tendencia.
+  static const semanasPorDefecto = 4;
+
+  Stream<List<double?>> call(
+    String grupoId, {
+    int semanas = semanasPorDefecto,
+  }) {
     final hoy = DateTime.now();
     // La última semana termina hoy; se cuentan días completos
     final inicio = DateTime(

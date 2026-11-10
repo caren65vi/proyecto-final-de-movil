@@ -142,14 +142,18 @@ enum _Nivel {
   final Color texto; // texto de la etiqueta
   final Color color; // banda lateral, barra y tendencia
 
-  /// Óptimo: 5 puntos o más sobre la meta. Bueno: en la meta o por encima.
-  /// Regular: por debajo de la meta.
+  /// Puntos sobre la meta a partir de los cuales el curso es "Óptimo"
+  /// (0.05 = 5 puntos porcentuales).
+  static const margenOptimo = 0.05;
+
+  /// Óptimo: [margenOptimo] o más sobre la meta. Bueno: en la meta o por
+  /// encima. Regular: por debajo de la meta.
   static _Nivel de(Curso curso) {
     if (curso.sesionesCerradas == 0 || curso.totalRegistros == 0) {
       return sinDatos;
     }
     final diferencia = curso.diferenciaMeta;
-    if (diferencia >= 0.05) return optimo;
+    if (diferencia >= margenOptimo) return optimo;
     if (diferencia >= 0) return bueno;
     return regular;
   }
@@ -511,7 +515,10 @@ class _Tendencia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final semanas = valores.isEmpty ? 4 : valores.length;
+    // Mientras carga se dibujan barras vacías con el número de semanas real
+    final semanas = valores.isEmpty
+        ? ObtenerTendenciaSemanal.semanasPorDefecto
+        : valores.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,

@@ -83,13 +83,16 @@ class _Resumen {
     return math.max(0, (meta * dictadas - asistidas) / (1 - meta));
   }
 
+  /// Parte del margen de faltas por debajo de la cual se pasa a "Normal"
+  /// (0.25 = le queda una cuarta parte o menos).
+  static const margenNormal = 0.25;
+
   _Estado get estado {
     if (dictadas == 0) return _Estado.sinClases;
     if (margen < 0) return _Estado.reprobando;
     if (porcentaje < meta) return _Estado.enRiesgo;
     if (inasistencias == 0) return _Estado.excelente;
-    // Le queda una cuarta parte o menos del margen del semestre
-    if (margen <= maxFaltas * 0.25) return _Estado.normal;
+    if (margen <= maxFaltas * margenNormal) return _Estado.normal;
     return _Estado.alDia;
   }
 }
@@ -205,7 +208,7 @@ class _TarjetaAsistencia extends StatelessWidget {
     final tercera = switch (estado) {
       _Estado.excelente => (
         titulo: 'Faltas',
-        valor: '0 hrs',
+        valor: '${_horas(r.inasistencias)} hrs',
         detalle: 'Impecable',
       ),
       _Estado.alDia => (
@@ -235,7 +238,7 @@ class _TarjetaAsistencia extends StatelessWidget {
       ),
     };
     final pie = switch (estado) {
-      _Estado.excelente => '100% de asistencia',
+      _Estado.excelente => '${_pct(r.porcentaje)} de asistencia',
       _Estado.alDia => 'Sin riesgo de pérdida',
       _Estado.normal => 'Aprobando',
       _Estado.enRiesgo => 'Límite crítico',
