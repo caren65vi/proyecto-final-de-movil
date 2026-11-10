@@ -64,13 +64,20 @@ class Curso {
 
   int get totalRegistros => totalPresentes + totalAusentes + totalJustificadas;
 
-  ///asistencias del curso
-  double get porcentajeAsistencia => totalRegistros == 0
-      ? 0
-      : totalPresentes * totalJustificadas / totalRegistros;
+  /// Asistencia del curso de 0 a 1: solo cuentan los presentes
+  /// (las justificadas se muestran aparte).
+  double get porcentajeAsistencia =>
+      totalRegistros == 0 ? 0 : totalPresentes / totalRegistros;
 
+  /// Diferencia con la meta (ej. 0.075 = 7.5 puntos por encima).
+  double get diferenciaMeta => porcentajeAsistencia - metaAsistencia;
 
-      //promedio por clase 
+  // Promedio por clase cerrada
+  double _promedio(int total) =>
+      sesionesCerradas == 0 ? 0 : total / sesionesCerradas;
+  double get promedioPresentes => _promedio(totalPresentes);
+  double get promedioAusentes => _promedio(totalAusentes);
+  double get promedioJustificadas => _promedio(totalJustificadas);
 
   /// Bloque del horario que está en curso en [momento] (por defecto, ahora).
   /// Cuenta desde 15 minutos antes del inicio, igual que el servidor.

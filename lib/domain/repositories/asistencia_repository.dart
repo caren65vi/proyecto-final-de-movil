@@ -1,4 +1,5 @@
 import '../entities/asistencia.dart';
+import '../entities/sesion.dart';
 
 /// Error con un mensaje listo para mostrar.
 class AsistenciaError implements Exception {
@@ -32,4 +33,7 @@ abstract class AsistenciaRepository {
 
   /// Token actual del QR, en tiempo real (cambia tras cada registro).
   Stream<String> tokenQR(String grupoId, String sesionId);
+
+  /// Sesiones cerradas del grupo desde una fecha, en tiempo real.
+  Stream<List<Sesion>> sesionesDesde(String grupoId, DateTime desde);
 }

@@ -23,6 +23,6 @@ class Sesion {
 
   int get total => presentes + ausentes + justificadas;
 
-  // De 0 a 1; la falta justificada no cuenta en contra
-  double get porcentaje => total == 0 ? 0 : (presentes + justificadas) / total;
+  // De 0 a 1; solo cuentan los presentes (las justificadas van aparte)
+  double get porcentaje => total == 0 ? 0 : presentes / total;
 }

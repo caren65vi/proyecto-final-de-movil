@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import '../../domain/entities/asistencia.dart';
+import '../../domain/entities/sesion.dart';
 import '../../domain/repositories/asistencia_repository.dart';
 import '../../domain/repositories/curso_repository.dart';
 import '../datasources/asistencia_datasource.dart';
@@ -56,6 +57,12 @@ class AsistenciaRepositoryImpl implements AsistenciaRepository {
   Stream<String> tokenQR(String grupoId, String sesionId) => datasource
       .tokenQR(grupoId, sesionId)
       .handleError((Object error) => throw _traducir(error));
+
+  @override
+  Stream<List<Sesion>> sesionesDesde(String grupoId, DateTime desde) =>
+      datasource
+          .sesionesDesde(grupoId, desde)
+          .handleError((Object error) => throw _traducir(error));
 
   Future<T> _ejecutar<T>(Future<T> Function() accion) async {
     try {

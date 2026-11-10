@@ -60,6 +60,11 @@ class CursoModel {
       metaAsistencia: (data['metaAsistencia'] as num?)?.toDouble() ?? 0.8,
       // Los cursos creados antes de este cambio no tienen el campo: se usa 0
       totalEstudiantes: (data['totalEstudiantes'] as num?)?.toInt() ?? 0,
+      // Contadores que mantiene el servidor (cerrarSesion / corregirAsistencia)
+      sesionesCerradas: (data['sesionesCerradas'] as num?)?.toInt() ?? 0,
+      totalPresentes: (data['totalPresentes'] as num?)?.toInt() ?? 0,
+      totalAusentes: (data['totalAusentes'] as num?)?.toInt() ?? 0,
+      totalJustificadas: (data['totalJustificadas'] as num?)?.toInt() ?? 0,
     );
   }
 }

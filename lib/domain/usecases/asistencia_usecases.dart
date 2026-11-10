@@ -34,6 +34,44 @@ class ObtenerAsistencias {
       repositorio.asistencias(grupoId, sesionId);
 }
 
+/// Asistencia de las últimas semanas de un grupo, de 0 a 1 (solo presentes).
+/// La lista va de la semana más antigua a la actual; null = no hubo clases.
+class ObtenerTendenciaSemanal {
+  final AsistenciaRepository repositorio;
+  ObtenerTendenciaSemanal(this.repositorio);
+
+  /// Semanas que se muestran en la tendencia.
+  static const semanasPorDefecto = 4;
+
+  Stream<List<double?>> call(
+    String grupoId, {
+    int semanas = semanasPorDefecto,
+  }) {
+    final hoy = DateTime.now();
+    // La última semana termina hoy; se cuentan días completos
+    final inicio = DateTime(
+      hoy.year,
+      hoy.month,
+      hoy.day,
+    ).subtract(Duration(days: 7 * semanas - 1));
+
+    return repositorio.sesionesDesde(grupoId, inicio).map((sesiones) {
+      final presentes = List.filled(semanas, 0);
+      final totales = List.filled(semanas, 0);
+      for (final sesion in sesiones) {
+        final semana = sesion.fecha.difference(inicio).inDays ~/ 7;
+        if (semana < 0 || semana >= semanas) continue;
+        presentes[semana] += sesion.presentes;
+        totales[semana] += sesion.total;
+      }
+      return [
+        for (var i = 0; i < semanas; i++)
+          totales[i] == 0 ? null : presentes[i] / totales[i],
+      ];
+    });
+  }
+}
+
 /// Token del QR en vivo: el servidor lo cambia después de cada registro,
 /// así el docente siempre muestra un código nuevo para el siguiente estudiante.
 class EscucharTokenQR {

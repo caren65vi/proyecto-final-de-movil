@@ -5,6 +5,7 @@ import 'package:ceiba/domain/entities/asistencia.dart';
 import 'package:ceiba/domain/entities/curso.dart';
 import 'package:ceiba/domain/entities/estudiante_inscrito.dart';
 import 'package:ceiba/domain/entities/materia_estudiante.dart';
+import 'package:ceiba/domain/entities/sesion.dart';
 import 'package:ceiba/domain/entities/usuario.dart';
 import 'package:ceiba/domain/repositories/asistencia_repository.dart';
 import 'package:ceiba/domain/repositories/auth_repository.dart';
@@ -134,6 +135,10 @@ class FakeAsistenciaRepository implements AsistenciaRepository {
   @override
   Stream<String> tokenQR(String grupoId, String sesionId) =>
       Stream.value('token-prueba');
+
+  @override
+  Stream<List<Sesion>> sesionesDesde(String grupoId, DateTime desde) =>
+      Stream.value(const []);
 }
 
 Future<void> abrirLogin(WidgetTester tester) {

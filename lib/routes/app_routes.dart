@@ -5,6 +5,7 @@ import '../domain/repositories/asistencia_repository.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/curso_repository.dart';
 import '../domain/repositories/inscripcion_repository.dart';
+import '../domain/usecases/asistencia_usecases.dart';
 import '../domain/usecases/auth_usecases.dart';
 import '../domain/usecases/curso_usecases.dart';
 import '../domain/usecases/inscripcion_usecases.dart';
@@ -103,6 +104,7 @@ class AppRoutes {
         usuario: args,
         cerrarSesion: CerrarSesion(authRepository),
         obtenerMisCursos: ObtenerMisCursos(cursoRepository),
+        obtenerTendenciaSemanal: ObtenerTendenciaSemanal(asistenciaRepository),
       ),
       homeDocente => _RutaNoEncontrada(nombre: settings.name),
       crearCurso when args is Usuario => CrearCursoScreen(

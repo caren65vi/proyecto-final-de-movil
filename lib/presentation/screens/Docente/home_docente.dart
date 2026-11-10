@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../domain/entities/curso.dart';
 import '../../../domain/entities/usuario.dart';
 import '../../../domain/repositories/curso_repository.dart';
+import '../../../domain/usecases/asistencia_usecases.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../../domain/usecases/curso_usecases.dart';
 import '../../../routes/app_routes.dart';
@@ -17,11 +18,13 @@ class HomeDocenteScreen extends StatefulWidget {
     required this.usuario,
     required this.cerrarSesion,
     required this.obtenerMisCursos,
+    required this.obtenerTendenciaSemanal,
   });
 
   final Usuario usuario;
   final CerrarSesion cerrarSesion;
   final ObtenerMisCursos obtenerMisCursos;
+  final ObtenerTendenciaSemanal obtenerTendenciaSemanal;
 
   @override
   State<HomeDocenteScreen> createState() => _HomeDocenteScreenState();
@@ -111,7 +114,10 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
         index: _pestana,
         children: [
           _buildInicio(),
-          const EstadisticasDocente(),
+          EstadisticasDocente(
+            cursos: _misCursos,
+            obtenerTendenciaSemanal: widget.obtenerTendenciaSemanal,
+          ),
           PerfilDocente(usuario: widget.usuario, onCerrarSesion: _cerrarSesion),
         ],
       ),
