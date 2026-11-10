@@ -208,7 +208,9 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
             _buildCursos(),
             HorarioEstudiante(materias: _materiasStream),
             AsistenciaEstudiante(
-              onEscanear: _abrirEscaner,
+              materias: _materias,
+              cargando: _cargando,
+              error: _error,
             ),
             PerfilEstudiante(
               usuario: widget.usuario,

@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../domain/entities/asistencia.dart';
+import '../../domain/entities/sesion.dart';
 import '../models/asistencia_model.dart';
+import '../models/sesion_model.dart';
 
 /// Habla con las Cloud Functions de asistencia y lee las asistencias.
 class AsistenciaDatasource {
@@ -65,6 +67,22 @@ class AsistenciaDatasource {
           .collection('asistencias')
           .snapshots()
           .map((s) => s.docs.map(AsistenciaModel.fromDocument).toList());
+
+  /// Sesiones cerradas del grupo desde [desde], ordenadas por fecha.
+  /// Filtra y ordena por un solo campo, así que no necesita índice compuesto.
+  Stream<List<Sesion>> sesionesDesde(String grupoId, DateTime desde) => _db
+      .collection('grupos')
+      .doc(grupoId)
+      .collection('sesiones')
+      .where('fecha', isGreaterThanOrEqualTo: Timestamp.fromDate(desde))
+      .orderBy('fecha')
+      .snapshots()
+      .map(
+        (s) => s.docs
+            .map(SesionModel.fromDocument)
+            .where((sesion) => !sesion.abierta)
+            .toList(),
+      );
 
   /// Token actual del QR. El servidor lo cambia cada vez que un estudiante
   /// registra su asistencia, así cada estudiante usa un código distinto.

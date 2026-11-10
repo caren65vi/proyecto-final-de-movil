@@ -34,6 +34,7 @@ class AppColors {
 
   // Estados
   static const Color error = Color(0xFFBA1A1A);
+  static const Color errorContainer = Color(0xFFFFDAD6);
 
   static const Color attendancePresent = Color(0xFFE2F0EC);
   static const Color attendanceWarning = Color(0xFFFCEEEA);

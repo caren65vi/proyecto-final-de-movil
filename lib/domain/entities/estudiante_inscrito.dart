@@ -22,9 +22,9 @@ class EstudianteInscrito {
   // Horas de clase que ya pasaron para este estudiante
   double get horasDictadas => horasAsistidas + horasFalta + horasJustificadas;
 
-  // Asistencia de 0 a 1; la falta justificada no cuenta en contra.
+  // Asistencia de 0 a 1; solo cuentan las horas asistidas
+  // (las justificadas se muestran aparte).
   // Si todavía no hay clases dictadas, se toma como 100 %.
-  double get porcentaje => horasDictadas == 0
-      ? 1
-      : (horasAsistidas + horasJustificadas) / horasDictadas;
+  double get porcentaje =>
+      horasDictadas == 0 ? 1 : horasAsistidas / horasDictadas;
 }
