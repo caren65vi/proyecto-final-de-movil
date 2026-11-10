@@ -13,7 +13,7 @@ class AuthError implements Exception {
 /// La sesión queda abierta para poder reenviar el correo.
 class CorreoNoVerificadoError extends AuthError {
   const CorreoNoVerificadoError()
-      : super('Debes verificar tu correo antes de iniciar sesión');
+    : super('Debes verificar tu correo antes de iniciar sesión');
 }
 
 /// Contrato: qué operaciones de autenticación existen (no dice cómo se hacen).

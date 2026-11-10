@@ -4,6 +4,9 @@ import '../domain/entities/usuario.dart';
 import '../domain/repositories/asistencia_repository.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/curso_repository.dart';
+import '../domain/repositories/facultad_repository.dart';
+import '../domain/usecases/facultad_usecases.dart';
+import '../presentation/screens/Docente/facultades_docente.dart';
 import '../domain/repositories/inscripcion_repository.dart';
 import '../domain/usecases/asistencia_usecases.dart';
 import '../domain/usecases/auth_usecases.dart';
@@ -33,12 +36,14 @@ class AppRoutes {
     required this.cursoRepository,
     required this.inscripcionRepository,
     required this.asistenciaRepository,
+    required this.facultadRepository,
   });
 
   final AuthRepository authRepository;
   final CursoRepository cursoRepository;
   final InscripcionRepository inscripcionRepository;
   final AsistenciaRepository asistenciaRepository;
+  final FacultadRepository facultadRepository;
 
   // ---------- Nombres de las rutas ----------
 
@@ -70,6 +75,9 @@ class AppRoutes {
 
   /// Argumento: el `Curso` del que se toma asistencia.
   static const String asistenciaQR = '/docente/asistencia';
+
+  /// Argumento: `Usuario` (docente) que gestiona las facultades.
+  static const String facultades = '/docente/facultades';
 
   /// Argumento opcional: `List<Curso>` del estudiante (para la clase en curso).
   static const String escanearQR = '/estudiante/escanear';
@@ -106,8 +114,17 @@ class AppRoutes {
       crearCurso when args is Usuario => CrearCursoScreen(
         usuario: args,
         cursoRepository: cursoRepository,
+        obtenerFacultades: ObtenerFacultades(facultadRepository),
+        crearFacultad: CrearFacultad(facultadRepository),
       ),
       crearCurso => _RutaNoEncontrada(nombre: settings.name),
+      facultades when args is Usuario => FacultadesScreen(
+        usuario: args,
+        obtenerFacultades: ObtenerFacultades(facultadRepository),
+        crearFacultad: CrearFacultad(facultadRepository),
+        eliminarFacultad: EliminarFacultad(facultadRepository),
+      ),
+      facultades => _RutaNoEncontrada(nombre: settings.name),
       detalleCurso => DetalleCursoScreen(
         grupoId: args is String ? args : '',
         cursoRepository: cursoRepository,
@@ -127,6 +144,7 @@ class AppRoutes {
         editarCurso: EditarCurso(cursoRepository),
         importarEstudiantes: ImportarEstudiantes(cursoRepository),
         agregarEstudiante: AgregarEstudiante(cursoRepository),
+        obtenerMiUbicacion: ObtenerMiUbicacion(cursoRepository),
       ),
       editarCurso => _RutaNoEncontrada(nombre: settings.name),
       homeEstudiante when args is Usuario => HomeEstudianteScreen(

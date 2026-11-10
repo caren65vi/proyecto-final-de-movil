@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ceiba/domain/entities/asistencia.dart';
 import 'package:ceiba/domain/entities/curso.dart';
 import 'package:ceiba/domain/entities/estudiante_inscrito.dart';
+import 'package:ceiba/domain/entities/facultad.dart';
+import 'package:ceiba/domain/repositories/facultad_repository.dart';
 import 'package:ceiba/domain/entities/materia_estudiante.dart';
 import 'package:ceiba/domain/entities/sesion.dart';
 import 'package:ceiba/domain/entities/usuario.dart';
@@ -134,12 +136,28 @@ class FakeAsistenciaRepository implements AsistenciaRepository {
       Stream.value(const []);
 }
 
+class FakeFacultadRepository implements FacultadRepository {
+  @override
+  Stream<List<Facultad>> facultades() => Stream.value(const []);
+
+  @override
+  Future<Facultad> crearFacultad({
+    required String id,
+    required String nombre,
+    required String docenteUid,
+  }) async => Facultad(id: id, nombre: nombre, creadaPor: docenteUid);
+
+  @override
+  Future<void> eliminarFacultad(String id) async {}
+}
+
 Future<void> abrirLogin(WidgetTester tester) {
   final rutas = AppRoutes(
     authRepository: FakeAuthRepository(),
     cursoRepository: FakeCursoRepository(),
     inscripcionRepository: FakeInscripcionRepository(),
     asistenciaRepository: FakeAsistenciaRepository(),
+    facultadRepository: FakeFacultadRepository(),
   );
   return tester.pumpWidget(
     MaterialApp(

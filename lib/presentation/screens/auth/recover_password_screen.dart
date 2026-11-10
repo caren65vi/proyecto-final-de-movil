@@ -70,7 +70,9 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
       await widget.recuperarContrasena(_correoEnviado!);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Te enviamos un nuevo enlace a $_correoEnviado.')),
+        SnackBar(
+          content: Text('Te enviamos un nuevo enlace a $_correoEnviado.'),
+        ),
       );
     } on AuthError catch (e) {
       _showError(e.mensaje);
@@ -523,9 +525,15 @@ class _SuccessPanel extends StatelessWidget {
             children: [
               _Paso(numero: 1, texto: 'Abre el correo y pulsa el enlace.'),
               SizedBox(height: 8),
-              _Paso(numero: 2, texto: 'Escribe tu nueva contraseña en la página que se abre.'),
+              _Paso(
+                numero: 2,
+                texto: 'Escribe tu nueva contraseña en la página que se abre.',
+              ),
               SizedBox(height: 8),
-              _Paso(numero: 3, texto: 'Vuelve a Ceiba e inicia sesión con ella.'),
+              _Paso(
+                numero: 3,
+                texto: 'Vuelve a Ceiba e inicia sesión con ella.',
+              ),
             ],
           ),
         ),
@@ -563,7 +571,10 @@ class _SuccessPanel extends StatelessWidget {
               ),
               child: Text(
                 reenviando ? 'Enviando…' : 'Reenviar enlace',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             TextButton(

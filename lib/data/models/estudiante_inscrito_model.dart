@@ -15,7 +15,7 @@ class EstudianteInscritoModel {
     'fechaInscripcion': FieldValue.serverTimestamp(),
   };
 
- /// Convierte un documento de inscripciones/{correo} en la entidad.
+  /// Convierte un documento de inscripciones/{correo} en la entidad.
   static EstudianteInscrito fromDocument(
     DocumentSnapshot<Map<String, dynamic>> document,
   ) {
@@ -30,5 +30,4 @@ class EstudianteInscritoModel {
       horasJustificadas: (data['horasJustificadas'] as num? ?? 0).toDouble(),
     );
   }
-
 }

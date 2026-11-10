@@ -127,14 +127,13 @@ class _AsistenciaQrScreenState extends State<AsistenciaQrScreen>
       // para el siguiente. Quien escanee el código viejo recibe
       // "El código QR ya fue usado".
       _escucharToken(_grupoId, sesionId).listen(_mostrarToken, onError: fallo),
-      _obtenerAsistencias(_grupoId, sesionId).listen(
-        (lista) => setState(() => _asistencias = lista),
-        onError: fallo,
-      ),
-      _obtenerEstudiantes(_grupoId).listen(
-        (lista) => setState(() => _inscritos = lista),
-        onError: fallo,
-      ),
+      _obtenerAsistencias(
+        _grupoId,
+        sesionId,
+      ).listen((lista) => setState(() => _asistencias = lista), onError: fallo),
+      _obtenerEstudiantes(
+        _grupoId,
+      ).listen((lista) => setState(() => _inscritos = lista), onError: fallo),
     ]);
   }
 
@@ -251,9 +250,8 @@ class _AsistenciaQrScreenState extends State<AsistenciaQrScreen>
     } on AsistenciaError catch (e) {
       if (!mounted) return;
       setState(() => _cerrando = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.mensaje)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.mensaje)));
     }
   }
 

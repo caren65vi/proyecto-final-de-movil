@@ -12,7 +12,9 @@ class UsuarioModel extends Usuario {
   });
 
   // Convierte un documento de Firestore en un UsuarioModel
-  factory UsuarioModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory UsuarioModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data()!;
     return UsuarioModel(
       uid: doc.id,
@@ -26,10 +28,10 @@ class UsuarioModel extends Usuario {
 
   // Convierte el UsuarioModel en un mapa para guardarlo en Firestore
   Map<String, dynamic> toMap() => {
-        'nombre': nombre,
-        'correo': correo,
-        'rol': rol,
-        // Hora del servidor, no la del celular
-        'fechaCreacion': FieldValue.serverTimestamp(),
-      };
+    'nombre': nombre,
+    'correo': correo,
+    'rol': rol,
+    // Hora del servidor, no la del celular
+    'fechaCreacion': FieldValue.serverTimestamp(),
+  };
 }

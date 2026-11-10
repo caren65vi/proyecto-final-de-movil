@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+// Solo LatLng: latlong2 también define un Path que choca con el de Flutter
+import 'package:latlong2/latlong.dart' show LatLng;
 
 import '../../../domain/entities/bloque_horario.dart';
 import '../../../domain/entities/curso.dart';
@@ -15,12 +18,14 @@ class EditarCursoScreen extends StatefulWidget {
     required this.editarCurso,
     required this.importarEstudiantes,
     required this.agregarEstudiante,
+    required this.obtenerMiUbicacion,
   });
 
   final Curso curso;
   final EditarCurso editarCurso;
   final ImportarEstudiantes importarEstudiantes;
   final AgregarEstudiante agregarEstudiante;
+  final ObtenerMiUbicacion obtenerMiUbicacion;
 
   @override
   State<EditarCursoScreen> createState() => _EditarCursoScreenState();
@@ -58,6 +63,23 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
   late DateTime _fin = widget.curso.fechaFin;
   late final List<BloqueHorario> _horario = [...widget.curso.horario];
 
+  // Ubicación donde se valida la asistencia. Los cursos viejos sin ubicación
+  // llegan con 0, 0: se toman como "sin ubicación".
+  late double? _latitud = _sinUbicacion ? null : widget.curso.latitud;
+  late double? _longitud = _sinUbicacion ? null : widget.curso.longitud;
+  late double _radio = widget.curso.radioMetros
+      .toDouble()
+      .clamp(_radioMin, _radioMax)
+      .toDouble();
+  bool _buscandoUbicacion = false;
+  final _mapController = MapController();
+
+  static const _radioMin = 10.0;
+  static const _radioMax = 500.0;
+
+  bool get _sinUbicacion =>
+      widget.curso.latitud == 0 && widget.curso.longitud == 0;
+
   // Archivo nuevo de estudiantes (se aplica al guardar)
   List<EstudianteInscrito> _nuevaNomina = [];
   String? _nombreArchivo;
@@ -68,14 +90,42 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
   void dispose() {
     _nombre.dispose();
     _aula.dispose();
+    _mapController.dispose();
     super.dispose();
+  }
+
+  // Toma la ubicación del GPS del celular y centra el mapa en ella
+  Future<void> _usarMiUbicacion() async {
+    setState(() => _buscandoUbicacion = true);
+    try {
+      final ubicacion = await widget.obtenerMiUbicacion();
+      if (!mounted) return;
+      // Si el mapa ya estaba visible hay que moverlo; si no, nace centrado
+      final mapaVisible = _latitud != null;
+      setState(() {
+        _latitud = ubicacion.latitud;
+        _longitud = ubicacion.longitud;
+      });
+      if (mapaVisible) {
+        _mapController.move(LatLng(ubicacion.latitud, ubicacion.longitud), 17);
+      }
+    } on CursoError catch (e) {
+      _mostrar(e.mensaje, error: true);
+    } catch (_) {
+      _mostrar(
+        'No se pudo obtener la ubicación. Intenta de nuevo.',
+        error: true,
+      );
+    } finally {
+      if (mounted) setState(() => _buscandoUbicacion = false);
+    }
   }
 
   // Grupos del 1 al 10, más el actual si es otro valor
   List<String> get _grupos => {
-        for (var g = 1; g <= 10; g++) '$g',
-        if (_grupo.isNotEmpty) _grupo,
-      }.toList();
+    for (var g = 1; g <= 10; g++) '$g',
+    if (_grupo.isNotEmpty) _grupo,
+  }.toList();
 
   DateTime _soloFecha(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -167,12 +217,19 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
   }
 
   void _eliminarArchivo() => setState(() {
-        _nuevaNomina = [];
-        _nombreArchivo = null;
-      });
+    _nuevaNomina = [];
+    _nombreArchivo = null;
+  });
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_latitud == null || _longitud == null) {
+      _mostrar(
+        'Fija la ubicación del curso para validar la asistencia',
+        error: true,
+      );
+      return;
+    }
 
     // Se copia el curso cambiando solo lo que se editó
     final c = widget.curso;
@@ -187,9 +244,9 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
       fechaInicio: _inicio,
       fechaFin: _fin,
       horario: _horario,
-      latitud: c.latitud,
-      longitud: c.longitud,
-      radioMetros: c.radioMetros,
+      latitud: _latitud!,
+      longitud: _longitud!,
+      radioMetros: _radio.round(),
       metaAsistencia: c.metaAsistencia,
       totalEstudiantes: c.totalEstudiantes,
     );
@@ -276,6 +333,8 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
             const SizedBox(height: 16),
             _buildHorarios(),
             const SizedBox(height: 16),
+            _buildUbicacion(),
+            const SizedBox(height: 16),
             _buildNomina(),
             const SizedBox(height: 24),
             SizedBox(
@@ -330,6 +389,172 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
     );
   }
 
+  // ---------- Ubicación ----------
+
+  Widget _buildUbicacion() {
+    final radioTexto = '${_radio.round()} m';
+    final hayUbicacion = _latitud != null && _longitud != null;
+
+    return _Tarjeta(
+      icono: Icons.pin_drop_outlined,
+      titulo: 'Ubicación',
+      accion: TextButton.icon(
+        onPressed: _buscandoUbicacion ? null : _usarMiUbicacion,
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primaryDark,
+          visualDensity: VisualDensity.compact,
+          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+        icon: _buscandoUbicacion
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.my_location, size: 16),
+        label: Text(hayUbicacion ? 'Usar mi ubicación' : 'Fijar ubicación'),
+      ),
+      children: [
+        Container(
+          height: 220,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLow,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.outlineVariant.withValues(alpha: 0.6),
+            ),
+          ),
+          child: hayUbicacion
+              ? _buildMapa()
+              : const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.gps_off, size: 32, color: AppColors.outline),
+                      SizedBox(height: 8),
+                      Text(
+                        'Este curso no tiene ubicación.\n'
+                        'Toca "Fijar ubicación" estando en el salón.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          hayUbicacion
+              ? '${_latitud!.toStringAsFixed(5)}, '
+                    '${_longitud!.toStringAsFixed(5)} · '
+                    'Toca el mapa para mover el punto.'
+              : 'Sin ubicación',
+          style: const TextStyle(color: AppColors.outline, fontSize: 11),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            const Expanded(child: _Rotulo('Radio de detección')),
+            Text(
+              radioTexto,
+              style: const TextStyle(
+                color: AppColors.primaryDark,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        Slider(
+          value: _radio,
+          min: _radioMin,
+          max: _radioMax,
+          divisions: 98, // pasos de 5 m
+          activeColor: AppColors.primaryDark,
+          inactiveColor: AppColors.surfaceHigh,
+          label: radioTexto,
+          onChanged: (v) => setState(() => _radio = v),
+        ),
+      ],
+    );
+  }
+
+  // Mapa de OpenStreetMap con el punto del curso y el radio a escala
+  Widget _buildMapa() {
+    final centro = LatLng(_latitud!, _longitud!);
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: centro,
+        initialZoom: 17,
+        minZoom: 3,
+        maxZoom: 19,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        ),
+        // Tocar el mapa mueve el punto del curso
+        onTap: (_, punto) => setState(() {
+          _latitud = punto.latitude;
+          _longitud = punto.longitude;
+        }),
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          // OpenStreetMap pide identificar la app que descarga los mapas
+          userAgentPackageName: 'com.example.ceiba',
+        ),
+        CircleLayer(
+          circles: [
+            CircleMarker(
+              point: centro,
+              radius: _radio,
+              useRadiusInMeter: true,
+              color: AppColors.primaryDark.withValues(alpha: 0.15),
+              borderColor: AppColors.primaryDark.withValues(alpha: 0.6),
+              borderStrokeWidth: 2,
+            ),
+          ],
+        ),
+        MarkerLayer(
+          markers: [
+            Marker(
+              point: centro,
+              width: 36,
+              height: 36,
+              child: const Icon(
+                Icons.location_on,
+                size: 36,
+                color: AppColors.primaryDark,
+              ),
+            ),
+          ],
+        ),
+        // Crédito obligatorio de OpenStreetMap
+        const Align(
+          alignment: Alignment.bottomRight,
+          child: Padding(
+            padding: EdgeInsets.all(4),
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: Color(0xCCFFFFFF)),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                child: Text(
+                  '© OpenStreetMap',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 9),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ---------- Encabezado ----------
 
   Widget _buildEncabezado() {
@@ -366,7 +591,9 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
           margin: const EdgeInsets.only(bottom: 6),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: _activo ? AppColors.primaryFixed : AppColors.surfaceContainer,
+            color: _activo
+                ? AppColors.primaryFixed
+                : AppColors.surfaceContainer,
             borderRadius: BorderRadius.circular(999),
           ),
           child: Row(
@@ -563,7 +790,8 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
           _FilaSesion(
             letra: _diasLargos[_horario[i].dia - 1][0],
             dia: _diasLargos[_horario[i].dia - 1],
-            horas: '${_hora12(_horario[i].inicio)} - '
+            horas:
+                '${_hora12(_horario[i].inicio)} - '
                 '${_hora12(_horario[i].fin)}',
             destacada: i.isEven,
             onEditar: () => _editarSesion(i),
@@ -1101,9 +1329,7 @@ class _DialogoSesionState extends State<_DialogoSesion> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(
-        widget.inicial == null ? 'Nuevo horario' : 'Editar horario',
-      ),
+      title: Text(widget.inicial == null ? 'Nuevo horario' : 'Editar horario'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1150,9 +1376,7 @@ class _DialogoSesionState extends State<_DialogoSesion> {
         ),
         FilledButton(
           onPressed: _confirmar,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.primaryDark,
-          ),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primaryDark),
           child: const Text('Listo'),
         ),
       ],

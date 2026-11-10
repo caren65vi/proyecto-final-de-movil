@@ -6,10 +6,13 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../../../domain/entities/bloque_horario.dart';
 import '../../../domain/entities/curso.dart';
 import '../../../domain/entities/estudiante_inscrito.dart';
+import '../../../domain/entities/facultad.dart';
 import '../../../domain/entities/usuario.dart';
 import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/curso_usecases.dart';
+import '../../../domain/usecases/facultad_usecases.dart';
 import '../../theme/app_colors.dart';
+import 'facultades_docente.dart';
 
 /// Una sesión semanal del curso: día y rango de horas.
 class _Sesion {
@@ -26,23 +29,21 @@ class CrearCursoScreen extends StatefulWidget {
     super.key,
     required this.usuario,
     required this.cursoRepository,
+    required this.obtenerFacultades,
+    required this.crearFacultad,
   });
 
   // Docente con sesión abierta: queda como dueño del curso
   final Usuario usuario;
   final CursoRepository cursoRepository;
+  final ObtenerFacultades obtenerFacultades;
+  final CrearFacultad crearFacultad;
 
   @override
   State<CrearCursoScreen> createState() => _CrearCursoScreenState();
 }
 
 class _CrearCursoScreenState extends State<CrearCursoScreen> {
-  static const _facultades = [
-    'Facultad de Ingeniería',
-    'Ciencias Básicas',
-    'Ciencias de la Salud',
-    'Arquitectura y Diseño',
-  ];
   static const _dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   static const _diasLargos = [
     'Lunes',
@@ -71,6 +72,8 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
   final _nombreController = TextEditingController();
   final _salonController = TextEditingController();
 
+  // Facultades de Firestore (las crean los docentes)
+  late final Stream<List<Facultad>> _facultades = widget.obtenerFacultades();
   String? _facultad;
   int? _grupo;
   DateTimeRange? _periodo;
@@ -100,9 +103,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
   // Casos de uso, armados con el repositorio que llega de afuera
   late final _crearCurso = CrearCurso(widget.cursoRepository);
   late final _obtenerMiUbicacion = ObtenerMiUbicacion(widget.cursoRepository);
-  late final _importarEstudiantes = ImportarEstudiantes(
-    widget.cursoRepository,
-  );
+  late final _importarEstudiantes = ImportarEstudiantes(widget.cursoRepository);
 
   @override
   void dispose() {
@@ -152,8 +153,8 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
   Future<void> _elegirHora({required bool esDesde}) async {
     final hora = await showTimePicker(
       context: context,
-      initialTime: (esDesde ? _desde : _hasta) ??
-          const TimeOfDay(hour: 7, minute: 0),
+      initialTime:
+          (esDesde ? _desde : _hasta) ?? const TimeOfDay(hour: 7, minute: 0),
       helpText: esDesde ? 'Hora de inicio' : 'Hora de fin',
     );
     if (hora == null) return;
@@ -268,9 +269,8 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
     try {
       await _crearCurso(curso, _estudiantes);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Curso creado')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Curso creado')));
       Navigator.pop(context, true);
     } on CursoError catch (e) {
       if (mounted) _mostrarError(e.mensaje);
@@ -414,21 +414,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
               ? 'Escribe el nombre del curso'
               : null,
         ),
-        DropdownButtonFormField<String>(
-          initialValue: _facultad,
-          isExpanded: true,
-          icon: const Icon(Icons.expand_more, color: AppColors.outline),
-          decoration: _decoracion(
-            'Selecciona Facultad / Carrera',
-            Icons.apartment_outlined,
-          ),
-          items: [
-            for (final f in _facultades)
-              DropdownMenuItem(value: f, child: Text(f)),
-          ],
-          onChanged: (v) => setState(() => _facultad = v),
-          validator: (v) => v == null ? 'Selecciona la facultad' : null,
-        ),
+        _buildFacultad(),
         TextFormField(
           controller: _salonController,
           decoration: _decoracion(
@@ -450,6 +436,76 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
         ),
       ],
     );
+  }
+
+  // Lista de facultades de Firestore y botón para crear una nueva
+  Widget _buildFacultad() {
+    return StreamBuilder<List<Facultad>>(
+      stream: _facultades,
+      builder: (context, snapshot) {
+        final nombres = [for (final f in snapshot.data ?? const []) f.nombre];
+        // La recién creada puede llegar antes que la lista actualizada
+        if (_facultad != null && !nombres.contains(_facultad)) {
+          nombres.add(_facultad!);
+        }
+        final cargando = snapshot.data == null && !snapshot.hasError;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DropdownButtonFormField<String>(
+              // La key hace que el campo muestre la facultad recién creada
+              key: ValueKey(_facultad),
+              initialValue: _facultad,
+              isExpanded: true,
+              icon: const Icon(Icons.expand_more, color: AppColors.outline),
+              decoration: _decoracion(
+                cargando
+                    ? 'Cargando facultades…'
+                    : nombres.isEmpty
+                    ? 'No hay facultades: crea una'
+                    : 'Selecciona Facultad / Carrera',
+                Icons.apartment_outlined,
+              ),
+              items: [
+                for (final nombre in nombres)
+                  DropdownMenuItem(value: nombre, child: Text(nombre)),
+              ],
+              onChanged: (v) => setState(() => _facultad = v),
+              validator: (v) => v == null ? 'Selecciona la facultad' : null,
+            ),
+            if (snapshot.hasError)
+              const Padding(
+                padding: EdgeInsets.only(top: 4, left: 4),
+                child: Text(
+                  'No se pudieron cargar las facultades',
+                  style: TextStyle(color: AppColors.error, fontSize: 12),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _nuevaFacultad,
+                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Nueva facultad'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _nuevaFacultad() async {
+    final creada = await mostrarDialogoNuevaFacultad(
+      context,
+      crearFacultad: widget.crearFacultad,
+      docenteUid: widget.usuario.uid,
+    );
+    if (creada != null && mounted) {
+      setState(() => _facultad = creada.nombre);
+    }
   }
 
   InputDecoration _decoracion(String hint, IconData icono) {
@@ -524,9 +580,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
       titulo: 'Horario de Clases',
       accion: n == 0
           ? null
-          : _Etiqueta(
-              n == 1 ? '1 sesión agregada' : '$n sesiones agregadas',
-            ),
+          : _Etiqueta(n == 1 ? '1 sesión agregada' : '$n sesiones agregadas'),
       children: [
         for (var i = 0; i < _sesiones.length; i++) _buildSesion(i),
         if (_editandoSesion)
@@ -884,7 +938,9 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
                     )
                   : const Icon(Icons.my_location, size: 16),
               label: Text(
-                _latitud == null ? 'Fijar mi ubicación' : 'Actualizar ubicación',
+                _latitud == null
+                    ? 'Fijar mi ubicación'
+                    : 'Actualizar ubicación',
               ),
             ),
             const Spacer(),
@@ -1142,10 +1198,7 @@ class _Tarjeta extends StatelessWidget {
               ?accion,
             ],
           ),
-          for (final child in children) ...[
-            const SizedBox(height: 8),
-            child,
-          ],
+          for (final child in children) ...[const SizedBox(height: 8), child],
         ],
       ),
     );

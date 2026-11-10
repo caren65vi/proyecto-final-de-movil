@@ -316,11 +316,7 @@ class _EscanearQrScreenState extends State<EscanearQrScreen>
             ),
             child: const Row(
               children: [
-                Icon(
-                  Icons.qr_code_scanner,
-                  size: 20,
-                  color: AppColors.primary,
-                ),
+                Icon(Icons.qr_code_scanner, size: 20, color: AppColors.primary),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(

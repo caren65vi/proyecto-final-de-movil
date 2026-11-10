@@ -100,6 +100,25 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------- facultades (las crean los docentes; las ven todos) ----------
+    // ID = nombre sin tildes ni mayúsculas, así no se repiten.
+
+    match /facultades/{facultadId} {
+      allow read: if autenticado();
+
+      allow create: if esDocente()
+                    && request.resource.data.keys().hasOnly(['nombre', 'creadaPor', 'creadaEn'])
+                    && request.resource.data.nombre is string
+                    && request.resource.data.nombre.size() > 0
+                    && request.resource.data.nombre.size() <= 80
+                    && request.resource.data.creadaPor == request.auth.uid
+                    && request.resource.data.creadaEn == request.time;
+
+      // Solo quien la creó la puede borrar; no se edita
+      allow update: if false;
+      allow delete: if esDocente() && resource.data.creadaPor == request.auth.uid;
+    }
+
     // ---------- grupos ----------
 
     match /grupos/{grupoId} {

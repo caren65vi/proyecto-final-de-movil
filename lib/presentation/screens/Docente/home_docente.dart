@@ -117,7 +117,13 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
             cursos: _misCursos,
             obtenerTendenciaSemanal: widget.obtenerTendenciaSemanal,
           ),
-          PerfilDocente(usuario: widget.usuario, onCerrarSesion: _cerrarSesion),
+          PerfilDocente(
+            usuario: widget.usuario,
+            cursos: _misCursos,
+            onCerrarSesion: _cerrarSesion,
+            // "Cursos Activos" lleva a la lista de cursos (pestaña Inicio)
+            onVerCursos: () => setState(() => _pestana = 0),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(

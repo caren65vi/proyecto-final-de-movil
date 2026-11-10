@@ -91,7 +91,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     } on AuthError catch (e) {
       _showMessage(e.mensaje, error: true);
     } catch (_) {
-      _showMessage('Ocurrió un error inesperado. Intenta de nuevo.', error: true);
+      _showMessage(
+        'Ocurrió un error inesperado. Intenta de nuevo.',
+        error: true,
+      );
     } finally {
       if (mounted) setState(() => _comprobando = false);
     }
@@ -108,7 +111,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     } on AuthError catch (e) {
       _showMessage(e.mensaje, error: true);
     } catch (_) {
-      _showMessage('No se pudo reenviar el correo. Intenta de nuevo.', error: true);
+      _showMessage(
+        'No se pudo reenviar el correo. Intenta de nuevo.',
+        error: true,
+      );
     } finally {
       if (mounted) setState(() => _reenviando = false);
     }
@@ -275,7 +281,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                     children: [
                       const _Paso(
                         numero: 1,
-                        texto: 'Abre el correo de Ceiba en tu bandeja de entrada.',
+                        texto:
+                            'Abre el correo de Ceiba en tu bandeja de entrada.',
                       ),
                       const SizedBox(height: 12),
                       const _Paso(
@@ -356,7 +363,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 const Text(
                   '¿No te llegó el correo?',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
                 ),
 
                 const SizedBox(height: 6),
@@ -395,7 +405,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 const Text(
                   'Sistema de Información Académica · Ceiba',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),

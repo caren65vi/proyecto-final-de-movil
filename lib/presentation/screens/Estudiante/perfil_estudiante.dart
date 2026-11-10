@@ -31,9 +31,8 @@ class PerfilEstudiante extends StatelessWidget {
 
   void _copiarCorreo(BuildContext context) {
     Clipboard.setData(ClipboardData(text: usuario.correo));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Correo copiado')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Correo copiado')));
   }
 
   @override

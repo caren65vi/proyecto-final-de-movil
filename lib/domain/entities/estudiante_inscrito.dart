@@ -8,7 +8,6 @@ class EstudianteInscrito {
   final double horasFalta;
   final double horasJustificadas;
 
-
   const EstudianteInscrito({
     required this.correo,
     required this.nombre,

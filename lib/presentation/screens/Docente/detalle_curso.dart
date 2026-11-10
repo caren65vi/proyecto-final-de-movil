@@ -234,10 +234,12 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
 
   Widget _buildContenido(Curso curso) {
     final sesiones = _proximasSesiones(curso);
-    final finalizado = sesiones.isNotEmpty && sesiones.every((s) => s.finalizado);
+    final finalizado =
+        sesiones.isNotEmpty && sesiones.every((s) => s.finalizado);
     // La primera que no está en curso ni finalizada es la "próxima"
-    final indiceProxima =
-        sesiones.indexWhere((s) => !s.enCurso && !s.finalizado);
+    final indiceProxima = sesiones.indexWhere(
+      (s) => !s.enCurso && !s.finalizado,
+    );
     debugPrint(
       '[DetalleCurso] ${curso.id} inicio=${curso.fechaInicio} '
       'fin=${curso.fechaFin} horario=${curso.horario.length} bloques',
@@ -399,8 +401,18 @@ class _Sesion {
 }
 
 const _mesesCortos = [
-  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
 ];
 
 // Ej. "14 Jun 2026"
@@ -445,19 +457,23 @@ List<_Sesion> _proximasSesiones(Curso curso) {
     }
     if (dia.isAfter(fin)) {
       // Última vez que cayó ese día dentro del período
-      final ultima =
-          fin.subtract(Duration(days: (fin.weekday - bloque.dia + 7) % 7));
+      final ultima = fin.subtract(
+        Duration(days: (fin.weekday - bloque.dia + 7) % 7),
+      );
       if (ultima.isBefore(inicio)) continue; // ese día nunca cae en el período
       sesiones.add(_Sesion(fecha: ultima, bloque: bloque, finalizado: true));
       continue;
     }
-    final enCurso = !ahora.isBefore(_conHora(dia, bloque.inicio)) &&
+    final enCurso =
+        !ahora.isBefore(_conHora(dia, bloque.inicio)) &&
         ahora.isBefore(_conHora(dia, bloque.fin));
     sesiones.add(_Sesion(fecha: dia, bloque: bloque, enCurso: enCurso));
   }
   sesiones.sort(
-    (a, b) => _conHora(a.fecha, a.bloque.inicio)
-        .compareTo(_conHora(b.fecha, b.bloque.inicio)),
+    (a, b) => _conHora(
+      a.fecha,
+      a.bloque.inicio,
+    ).compareTo(_conHora(b.fecha, b.bloque.inicio)),
   );
   return sesiones;
 }
@@ -626,8 +642,8 @@ class _TarjetaSesion extends StatelessWidget {
     final colorBorde = sesion.enCurso
         ? AppColors.primary
         : sesion.finalizado
-            ? AppColors.outlineVariant
-            : AppColors.tertiary;
+        ? AppColors.outlineVariant
+        : AppColors.tertiary;
     final indiceDia = sesion.fecha.weekday - 1;
 
     return Container(
@@ -908,7 +924,8 @@ class _FilaEstudiante extends StatelessWidget {
                     ),
                     children: [
                       TextSpan(
-                        text: 'ID: '
+                        text:
+                            'ID: '
                             '${estudiante.codigoEstudiante ?? estudiante.correo}'
                             ' • ',
                       ),
