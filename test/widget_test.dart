@@ -7,6 +7,7 @@ import 'package:ceiba/domain/entities/estudiante_inscrito.dart';
 import 'package:ceiba/domain/entities/facultad.dart';
 import 'package:ceiba/domain/entities/programa.dart';
 import 'package:ceiba/domain/entities/recuperacion.dart';
+import 'package:ceiba/domain/entities/resultado_importacion.dart';
 import 'package:ceiba/domain/repositories/facultad_repository.dart';
 import 'package:ceiba/domain/entities/materia_estudiante.dart';
 import 'package:ceiba/domain/entities/sesion.dart';
@@ -117,8 +118,7 @@ class FakeCursoRepository implements CursoRepository {
       (latitud: 1.619816, longitud: -75.604029);
 
   @override
-  Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
-  importarEstudiantes() async => null;
+  Future<ResultadoImportacion?> importarEstudiantes() async => null;
 }
 
 class FakeInscripcionRepository implements InscripcionRepository {

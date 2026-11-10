@@ -13,6 +13,7 @@ import '../../../domain/usecases/curso_usecases.dart';
 import '../../../domain/usecases/facultad_usecases.dart';
 import '../../theme/app_colors.dart';
 import 'facultades_docente.dart';
+import 'importar_estudiantes.dart';
 
 /// Una sesión semanal del curso: día y rango de horas.
 class _Sesion {
@@ -213,17 +214,18 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
     }
   }
 
+  // Muestra el formato, lee el archivo y avisa si cargó o el error
   Future<void> _elegirArchivo() async {
-    try {
-      final resultado = await _importarEstudiantes();
-      if (resultado == null || !mounted) return; // canceló
-      setState(() {
-        _estudiantes = resultado.estudiantes;
-        _nombreArchivo = resultado.nombreArchivo;
-      });
-    } on CursoError catch (e) {
-      if (mounted) _mostrarError(e.mensaje);
-    }
+    final resultado = await importarEstudiantesConFormato(
+      context,
+      importar: _importarEstudiantes,
+      cuandoSeGuardan: 'Quedarán inscritos cuando guardes el curso.',
+    );
+    if (resultado == null || !mounted) return;
+    setState(() {
+      _estudiantes = resultado.estudiantes;
+      _nombreArchivo = resultado.nombreArchivo;
+    });
   }
 
   Future<void> _guardarCurso() async {

@@ -1,6 +1,7 @@
 import '../entities/curso.dart';
 import '../entities/estudiante_inscrito.dart';
 import '../entities/recuperacion.dart';
+import '../entities/resultado_importacion.dart';
 import '../repositories/curso_repository.dart';
 
 /// Casos de uso de cursos: validan los datos y llaman al repositorio.
@@ -52,8 +53,7 @@ class ImportarEstudiantes {
   final CursoRepository repositorio;
   ImportarEstudiantes(this.repositorio);
 
-  Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
-  call() async {
+  Future<ResultadoImportacion?> call() async {
     final resultado = await repositorio.importarEstudiantes();
     if (resultado != null && resultado.estudiantes.isEmpty) {
       throw const CursoError('El archivo no tiene estudiantes con correo');

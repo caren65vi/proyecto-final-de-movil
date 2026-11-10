@@ -1,6 +1,7 @@
 import '../entities/curso.dart';
 import '../entities/estudiante_inscrito.dart';
 import '../entities/recuperacion.dart';
+import '../entities/resultado_importacion.dart';
 
 /// Error con un mensaje listo para mostrar al docente.
 class CursoError implements Exception {
@@ -52,6 +53,6 @@ abstract class CursoRepository {
 
   /// Abre el selector de archivos y lee la lista de estudiantes.
   /// Devuelve null si el docente cancela.
-  Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
-  importarEstudiantes();
+  /// Lanza CursoError con el motivo si el archivo no tiene el formato.
+  Future<ResultadoImportacion?> importarEstudiantes();
 }

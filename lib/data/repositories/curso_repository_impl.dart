@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import '../../domain/entities/curso.dart';
 import '../../domain/entities/estudiante_inscrito.dart';
 import '../../domain/entities/recuperacion.dart';
+import '../../domain/entities/resultado_importacion.dart';
 import '../../domain/repositories/curso_repository.dart';
 import '../datasources/curso_datasource.dart';
 import '../datasources/lista_estudiantes_datasource.dart';
@@ -53,8 +54,8 @@ class CursoRepositoryImpl implements CursoRepository {
       ubicacionDatasource.obtenerUbicacionActual();
 
   @override
-  Future<({String nombreArchivo, List<EstudianteInscrito> estudiantes})?>
-  importarEstudiantes() => listaDatasource.importarEstudiantes();
+  Future<ResultadoImportacion?> importarEstudiantes() =>
+      listaDatasource.importarEstudiantes();
 
   // Convierte cualquier error en un CursoError con mensaje en español
   CursoError _traducir(Object error) {

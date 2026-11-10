@@ -9,6 +9,7 @@ import '../../../domain/entities/estudiante_inscrito.dart';
 import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/curso_usecases.dart';
 import '../../theme/app_colors.dart';
+import 'importar_estudiantes.dart';
 
 /// Configuración del curso: datos generales, período, horarios y nómina.
 class EditarCursoScreen extends StatefulWidget {
@@ -203,17 +204,20 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
     });
   }
 
+  // Muestra el formato, lee el archivo y avisa si cargó o el error
   Future<void> _cargarArchivo() async {
-    try {
-      final resultado = await widget.importarEstudiantes();
-      if (resultado == null || !mounted) return; // canceló
-      setState(() {
-        _nuevaNomina = resultado.estudiantes;
-        _nombreArchivo = resultado.nombreArchivo;
-      });
-    } on CursoError catch (e) {
-      _mostrar(e.mensaje, error: true);
-    }
+    final resultado = await importarEstudiantesConFormato(
+      context,
+      importar: widget.importarEstudiantes,
+      cuandoSeGuardan:
+          'Toca "Guardar Cambios del Curso" para inscribirlos. '
+          'Los que ya estaban en el curso conservan su asistencia.',
+    );
+    if (resultado == null || !mounted) return;
+    setState(() {
+      _nuevaNomina = resultado.estudiantes;
+      _nombreArchivo = resultado.nombreArchivo;
+    });
   }
 
   void _eliminarArchivo() => setState(() {
