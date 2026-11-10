@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
         arguments: usuario,
       );
     } on CorreoNoVerificadoError catch (e) {
-      // La contraseña es correcta pero falta abrir el enlace del correo
+      // La contraseña es correcta pero falta verificar el correo con el código
       _showError(e.mensaje);
       _abrirVerificacion();
     } on AuthError catch (e) {
@@ -372,8 +372,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 20),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  // Wrap: si la letra del teléfono es grande, el botón
+                  // baja a otra línea en vez de desbordarse
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       const Text(
                         '¿No tienes una cuenta?',

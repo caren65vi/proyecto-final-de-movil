@@ -118,7 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _loading = true);
     try {
-      // Crea la cuenta en Firebase y envía el enlace de verificación
+      // Crea la cuenta en Firebase; la pantalla siguiente envía el código
       await widget.registrarUsuario(
         nombre: _nameController.text,
         correo: _emailController.text,

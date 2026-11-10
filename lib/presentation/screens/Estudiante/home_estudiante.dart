@@ -130,11 +130,12 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
     super.dispose();
   }
 
-  // Cierra la sesión en Firebase y vuelve al login (la primera pantalla)
+  // Cierra la sesión en Firebase y deja solo el login en la pila
+  // (si la sesión se restauró al abrir la app, el login no está debajo)
   Future<void> _cerrarSesion() async {
     await widget.cerrarSesion();
     if (!mounted) return;
-    Navigator.popUntil(context, (route) => route.isFirst);
+    Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (_) => false);
   }
 
   @override

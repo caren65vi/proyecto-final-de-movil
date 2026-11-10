@@ -88,6 +88,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ---------- códigos de verificación del correo (ID = uid) ----------
+    // Solo los usan las Cloud Functions; la app nunca los lee ni escribe.
+
+    match /verificaciones/{uid} {
+      allow read, write: if false;
+    }
+
     // ---------- sedes y periodos (solo lectura; se editan en la consola) ----------
 
     match /sedes/{sedeId} {

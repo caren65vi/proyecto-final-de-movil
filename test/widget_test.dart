@@ -46,7 +46,14 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> recuperarContrasena(String correo) async {}
 
   @override
-  Future<void> enviarCorreoVerificacion() async {}
+  Future<int> enviarCodigoVerificacion() async => 60;
+
+  @override
+  Future<void> verificarCodigo(String codigo) async {
+    if (codigo != '123456') {
+      throw const AuthError('Código incorrecto. Te quedan 4 intentos.');
+    }
+  }
 
   @override
   Future<bool> correoVerificado() async => true;
@@ -168,6 +175,104 @@ Future<void> abrirLogin(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets('La pantalla de carga sigue al login si no hay sesión', (
+    tester,
+  ) async {
+    final rutas = AppRoutes(
+      authRepository: FakeAuthRepository(),
+      cursoRepository: FakeCursoRepository(),
+      inscripcionRepository: FakeInscripcionRepository(),
+      asistenciaRepository: FakeAsistenciaRepository(),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        onGenerateInitialRoutes: (_) => [
+          rutas.generarRuta(const RouteSettings(name: AppRoutes.carga)),
+        ],
+        onGenerateRoute: rutas.generarRuta,
+      ),
+    );
+
+    expect(find.text('Ceiba'), findsOneWidget);
+
+    // Las animaciones son infinitas: se avanza el reloj en vez de pumpAndSettle
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Ceiba'), findsNothing);
+    expect(find.text('Iniciar sesión'), findsWidgets);
+  });
+
+  group('Verificación por código', () {
+    Future<void> abrirVerificacion(WidgetTester tester) {
+      final rutas = AppRoutes(
+        authRepository: FakeAuthRepository(),
+        cursoRepository: FakeCursoRepository(),
+        inscripcionRepository: FakeInscripcionRepository(),
+        asistenciaRepository: FakeAsistenciaRepository(),
+      );
+      // El login queda debajo, como cuando se llega desde el registro
+      return tester.pumpWidget(
+        MaterialApp(
+          onGenerateInitialRoutes: (_) => [
+            rutas.generarRuta(const RouteSettings(name: AppRoutes.login)),
+            rutas.generarRuta(
+              const RouteSettings(
+                name: AppRoutes.verificarCorreo,
+                arguments: 'caren@udla.edu.co',
+              ),
+            ),
+          ],
+          onGenerateRoute: rutas.generarRuta,
+        ),
+      );
+    }
+
+    testWidgets('Envía el código al abrir y muestra el vencimiento', (
+      tester,
+    ) async {
+      await abrirVerificacion(tester);
+      await tester.pump();
+
+      expect(find.text('Verifica tu correo'), findsOneWidget);
+      expect(find.textContaining('Expira en 09:5'), findsOneWidget);
+      expect(find.textContaining('Solicitar nuevo código ('), findsOneWidget);
+
+      // Se quita la pantalla para cancelar su reloj
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('Un código incorrecto muestra el error', (tester) async {
+      await abrirVerificacion(tester);
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField), '111111');
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.text('Código incorrecto. Te quedan 4 intentos.'),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('El código correcto vuelve al login', (tester) async {
+      await abrirVerificacion(tester);
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField), '123456');
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('Verifica tu correo'), findsNothing);
+      expect(
+        find.text('Correo verificado. Ya puedes iniciar sesión.'),
+        findsOneWidget,
+      );
+    });
+  });
+
   testWidgets('Muestra errores si los campos están vacíos', (tester) async {
     await abrirLogin(tester);
 

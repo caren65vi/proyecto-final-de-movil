@@ -7,8 +7,16 @@ const {
   getFirestore,
   FieldValue,
   GeoPoint,
+  Timestamp,
 } = require("firebase-admin/firestore");
+const {defineSecret} = require("firebase-functions/params");
 const crypto = require("crypto");
+const nodemailer = require("nodemailer");
+
+// Cuenta de Gmail que envía los códigos (se configuran con
+// firebase functions:secrets:set GMAIL_USUARIO / GMAIL_CLAVE)
+const GMAIL_USUARIO = defineSecret("GMAIL_USUARIO");
+const GMAIL_CLAVE = defineSecret("GMAIL_CLAVE");
 
 initializeApp();
 const db = getFirestore();
@@ -24,6 +32,11 @@ const DESFASE_COLOMBIA_MS = -5 * 60 * 60 * 1000;
 const MARGEN_GPS = 30;
 // Minutos antes del inicio en que ya se puede abrir la asistencia
 const MINUTOS_ANTES = 15;
+
+// Código de verificación del correo
+const MINUTOS_CODIGO = 10; // vigencia
+const MAX_INTENTOS = 5; // intentos fallidos antes de pedir otro
+const SEGUNDOS_REENVIO = 60; // espera mínima entre envíos
 
 // Campo que suma horas según el estado de la asistencia
 const CAMPO_HORAS = {
@@ -180,6 +193,165 @@ function distanciaMetros(lat1, lon1, lat2, lon2) {
 function nuevoToken() {
   return crypto.randomBytes(16).toString("hex");
 }
+
+/**
+ * Huella del código: en Firestore nunca se guarda el código en claro.
+ * @param {string} uid UID del usuario.
+ * @param {string} codigo Código de 6 dígitos.
+ * @return {string} SHA-256 en hexadecimal.
+ */
+function huellaCodigo(uid, codigo) {
+  return crypto.createHash("sha256").update(`${uid}:${codigo}`).digest("hex");
+}
+
+// ---------------------------------------------------------------------
+// enviarCodigoVerificacion: {} -> { esperaSegundos }
+// Genera un código de 6 dígitos y lo envía al correo del usuario.
+// Si se pidió otro hace menos de un minuto no envía nada y responde
+// cuántos segundos faltan (el código anterior sigue sirviendo).
+// ---------------------------------------------------------------------
+exports.enviarCodigoVerificacion = onCall(
+    {secrets: [GMAIL_USUARIO, GMAIL_CLAVE]},
+    async (request) => {
+      const auth = exigirSesion(request);
+      const usuario = await getAuth().getUser(auth.uid);
+      if (usuario.emailVerified) {
+        throw new HttpsError(
+            "failed-precondition",
+            "Tu correo ya está verificado. Inicia sesión.",
+        );
+      }
+      if (!usuario.email) {
+        throw new HttpsError(
+            "failed-precondition",
+            "La cuenta no tiene correo",
+        );
+      }
+
+      const ref = db.collection("verificaciones").doc(auth.uid);
+      const codigo = crypto.randomInt(0, 1000000).toString().padStart(6, "0");
+      const ahora = Date.now();
+
+      // La transacción evita que dos pedidos seguidos envíen dos correos
+      const espera = await db.runTransaction(async (t) => {
+        const snap = await t.get(ref);
+        const enviadoEn = snap.exists ? snap.get("enviadoEn") : null;
+        const pasados = enviadoEn ?
+          (ahora - enviadoEn.toMillis()) / 1000 :
+          null;
+        if (pasados !== null && pasados < SEGUNDOS_REENVIO) {
+          return Math.ceil(SEGUNDOS_REENVIO - pasados);
+        }
+        t.set(ref, {
+          huella: huellaCodigo(auth.uid, codigo),
+          intentos: 0,
+          enviadoEn: Timestamp.fromMillis(ahora),
+          expiraEn: Timestamp.fromMillis(ahora + MINUTOS_CODIGO * 60 * 1000),
+        });
+        return 0;
+      });
+      if (espera > 0) return {esperaSegundos: espera};
+
+      try {
+        const correo = nodemailer.createTransport({
+          service: "gmail",
+          auth: {user: GMAIL_USUARIO.value(), pass: GMAIL_CLAVE.value()},
+        });
+        await correo.sendMail({
+          from: `"Ceiba" <${GMAIL_USUARIO.value()}>`,
+          to: usuario.email,
+          subject: `Tu código de verificación de Ceiba: ${codigo}`,
+          text:
+            `Tu código de verificación es ${codigo}.\n` +
+            `Vence en ${MINUTOS_CODIGO} minutos.\n\n` +
+            "Si no creaste una cuenta en Ceiba, ignora este correo.",
+          html:
+            "<div style=\"font-family:Arial,sans-serif;color:#191c1b\">" +
+            "<h2 style=\"color:#134e3f\">Verifica tu correo</h2>" +
+            "<p>Escribe este código en la app Ceiba:</p>" +
+            "<p style=\"font-size:32px;font-weight:bold;letter-spacing:8px;" +
+            `color:#00362a">${codigo}</p>` +
+            `<p>Vence en ${MINUTOS_CODIGO} minutos.</p>` +
+            "<p style=\"color:#707973;font-size:12px\">Si no creaste una " +
+            "cuenta en Ceiba, ignora este correo.</p></div>",
+        });
+      } catch (error) {
+        logger.error("enviarCodigoVerificacion: no se pudo enviar", {
+          uid: auth.uid,
+          error: error.message,
+        });
+        // Se borra para que pueda pedir otro sin esperar
+        await ref.delete();
+        throw new HttpsError(
+            "unavailable",
+            "No se pudo enviar el correo. Intenta de nuevo en un momento.",
+        );
+      }
+      return {esperaSegundos: SEGUNDOS_REENVIO};
+    },
+);
+
+// ---------------------------------------------------------------------
+// verificarCodigo: { codigo } -> { ok }
+// Si el código es correcto marca el correo como verificado en Auth.
+// ---------------------------------------------------------------------
+exports.verificarCodigo = onCall(async (request) => {
+  const auth = exigirSesion(request);
+  const codigo = request.data && request.data.codigo;
+  if (typeof codigo !== "string" || !/^\d{6}$/.test(codigo)) {
+    throw new HttpsError("invalid-argument", "El código debe tener 6 dígitos");
+  }
+
+  const ref = db.collection("verificaciones").doc(auth.uid);
+  // Devuelve el resultado en vez de lanzar el error dentro de la
+  // transacción, para que el intento fallido sí quede guardado
+  const resultado = await db.runTransaction(async (t) => {
+    const snap = await t.get(ref);
+    if (!snap.exists) return {estado: "sin-codigo"};
+    if (snap.get("expiraEn").toMillis() < Date.now()) {
+      return {estado: "vencido"};
+    }
+    const intentos = snap.get("intentos") || 0;
+    if (intentos >= MAX_INTENTOS) return {estado: "bloqueado"};
+
+    const esperada = Buffer.from(snap.get("huella"), "hex");
+    const recibida = Buffer.from(huellaCodigo(auth.uid, codigo), "hex");
+    if (!crypto.timingSafeEqual(esperada, recibida)) {
+      t.update(ref, {intentos: intentos + 1});
+      return {estado: "incorrecto", quedan: MAX_INTENTOS - intentos - 1};
+    }
+    t.delete(ref);
+    return {estado: "ok"};
+  });
+
+  switch (resultado.estado) {
+    case "sin-codigo":
+      throw new HttpsError(
+          "failed-precondition",
+          "No hay un código activo. Pide uno nuevo.",
+      );
+    case "vencido":
+      throw new HttpsError(
+          "deadline-exceeded",
+          "El código venció. Pide uno nuevo.",
+      );
+    case "bloqueado":
+      throw new HttpsError(
+          "resource-exhausted",
+          "Demasiados intentos. Pide un código nuevo.",
+      );
+    case "incorrecto":
+      throw new HttpsError(
+          "invalid-argument",
+          resultado.quedan > 0 ?
+            `Código incorrecto. Te quedan ${resultado.quedan} intentos.` :
+            "Código incorrecto. Pide un código nuevo.",
+      );
+  }
+
+  await getAuth().updateUser(auth.uid, {emailVerified: true});
+  return {ok: true};
+});
 
 // ---------------------------------------------------------------------
 // abrirSesion: { grupoId, horas? } -> { sesionId, token }

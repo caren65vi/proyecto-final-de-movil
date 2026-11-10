@@ -15,6 +15,7 @@ import '../domain/usecases/inscripcion_usecases.dart';
 import '../presentation/screens/Docente/crear_curso.dart';
 import '../presentation/screens/Docente/home_docente.dart';
 import '../presentation/screens/Estudiante/home_estudiante.dart';
+import '../presentation/screens/auth/carga_screen.dart';
 import '../presentation/screens/auth/login_screen.dart';
 import '../presentation/screens/auth/recover_password_screen.dart';
 import '../presentation/screens/auth/register_screen.dart';
@@ -47,7 +48,9 @@ class AppRoutes {
 
   // ---------- Nombres de las rutas ----------
 
-  /// Pantalla inicial.
+  /// Pantalla de carga: es la primera al abrir la app.
+  static const String carga = '/carga';
+
   static const String login = '/';
   static const String registro = '/registro';
 
@@ -89,6 +92,7 @@ class AppRoutes {
     final args = settings.arguments;
 
     final Widget pantalla = switch (settings.name) {
+      carga => CargaScreen(restaurarSesion: RestaurarSesion(authRepository)),
       login => LoginScreen(iniciarSesion: IniciarSesion(authRepository)),
       registro => RegisterScreen(
         registrarUsuario: RegistrarUsuario(authRepository),
@@ -99,8 +103,8 @@ class AppRoutes {
       ),
       verificarCorreo when args is String => VerifyEmailScreen(
         email: args,
-        enviarCorreoVerificacion: EnviarCorreoVerificacion(authRepository),
-        comprobarCorreoVerificado: ComprobarCorreoVerificado(authRepository),
+        enviarCodigo: EnviarCodigoVerificacion(authRepository),
+        verificarCodigo: VerificarCodigo(authRepository),
         cerrarSesion: CerrarSesion(authRepository),
       ),
       verificarCorreo => _RutaNoEncontrada(nombre: settings.name),
