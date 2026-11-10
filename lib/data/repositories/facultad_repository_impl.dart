@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 
 import '../../domain/entities/facultad.dart';
+import '../../domain/entities/programa.dart';
 import '../../domain/repositories/facultad_repository.dart';
 import '../datasources/facultad_datasource.dart';
 
@@ -31,6 +32,47 @@ class FacultadRepositoryImpl implements FacultadRepository {
   @override
   Future<void> eliminarFacultad(String id) =>
       _ejecutar(() => datasource.eliminarFacultad(id));
+
+  @override
+  Stream<List<Programa>> programas(String facultadId) => datasource
+      .programas(facultadId)
+      .handleError((Object error) => throw _traducir(error));
+
+  @override
+  Future<int> contarProgramas(String facultadId) =>
+      _ejecutar(() => datasource.contarProgramas(facultadId));
+
+  @override
+  Future<Programa> crearPrograma({
+    required String facultadId,
+    required String id,
+    required String nombre,
+    required String docenteUid,
+  }) => _ejecutar(
+    () => datasource.crearPrograma(
+      facultadId: facultadId,
+      id: id,
+      nombre: nombre,
+      docenteUid: docenteUid,
+    ),
+  );
+
+  @override
+  Future<void> eliminarPrograma(String facultadId, String programaId) =>
+      _ejecutar(() => datasource.eliminarPrograma(facultadId, programaId));
+
+  @override
+  Future<void> asignarProgramaEstudiante({
+    required String uid,
+    required Facultad facultad,
+    required Programa programa,
+  }) => _ejecutar(
+    () => datasource.asignarProgramaEstudiante(
+      uid: uid,
+      facultad: facultad,
+      programa: programa,
+    ),
+  );
 
   Future<T> _ejecutar<T>(Future<T> Function() accion) async {
     try {

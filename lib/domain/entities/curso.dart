@@ -79,10 +79,29 @@ class Curso {
   double get promedioAusentes => _promedio(totalAusentes);
   double get promedioJustificadas => _promedio(totalJustificadas);
 
+  /// Minutos antes del inicio en que ya se puede abrir la asistencia
+  /// (igual que MINUTOS_ANTES en el servidor).
+  static const minutosAntes = 15;
+
+  /// El curso está dentro de su período (de fechaInicio a fechaFin) en [momento].
+  bool enPeriodo([DateTime? momento]) {
+    final ahora = momento ?? DateTime.now();
+    final hoy = DateTime(ahora.year, ahora.month, ahora.day);
+    final inicio = DateTime(
+      fechaInicio.year,
+      fechaInicio.month,
+      fechaInicio.day,
+    );
+    final fin = DateTime(fechaFin.year, fechaFin.month, fechaFin.day);
+    return !hoy.isBefore(inicio) && !hoy.isAfter(fin);
+  }
+
   /// Bloque del horario que está en curso en [momento] (por defecto, ahora).
-  /// Cuenta desde 15 minutos antes del inicio, igual que el servidor.
+  /// Cuenta desde [minutosAntes] antes del inicio, igual que el servidor.
+  /// Fuera del período del curso no hay clase.
   BloqueHorario? bloqueEnCurso([DateTime? momento]) {
     final ahora = momento ?? DateTime.now();
+    if (!enPeriodo(ahora)) return null;
     final minutos = ahora.hour * 60 + ahora.minute;
     int aMinutos(String hora) {
       final partes = hora.split(':');
@@ -91,7 +110,7 @@ class Curso {
 
     for (final bloque in horario) {
       if (bloque.dia == ahora.weekday &&
-          minutos >= aMinutos(bloque.inicio) - 15 &&
+          minutos >= aMinutos(bloque.inicio) - minutosAntes &&
           minutos <= aMinutos(bloque.fin)) {
         return bloque;
       }

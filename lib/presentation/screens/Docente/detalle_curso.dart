@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../domain/entities/bloque_horario.dart';
 import '../../../domain/entities/curso.dart';
 import '../../../domain/entities/estudiante_inscrito.dart';
+import '../../../domain/entities/recuperacion.dart';
 import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/curso_usecases.dart';
 import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
+import 'recuperaciones_curso.dart';
 
 /// Gestionar clase: próximas sesiones del curso y estudiantes matriculados.
 class DetalleCursoScreen extends StatefulWidget {
@@ -41,6 +43,17 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
     _busquedaController.dispose();
     super.dispose();
   }
+
+  // Clases de recuperación (fuera del horario normal)
+  late final Stream<List<Recuperacion>> _recuperaciones = ObtenerRecuperaciones(
+    widget.cursoRepository,
+  )(widget.grupoId);
+  late final _programarRecuperacion = ProgramarRecuperacion(
+    widget.cursoRepository,
+  );
+  late final _eliminarRecuperacion = EliminarRecuperacion(
+    widget.cursoRepository,
+  );
 
   late final _agregar = AgregarEstudiante(widget.cursoRepository);
   late final _quitar = QuitarEstudiante(widget.cursoRepository);
@@ -282,6 +295,17 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
 
         const SizedBox(height: 12),
 
+        // ---------- Clases de recuperación ----------
+        SeccionRecuperaciones(
+          curso: curso,
+          recuperaciones: _recuperaciones,
+          programar: _programarRecuperacion,
+          eliminar: _eliminarRecuperacion,
+          onIniciar: () => _iniciarClase(curso),
+        ),
+
+        const SizedBox(height: 12),
+
         // ---------- Alumnos matriculados ----------
         StreamBuilder<List<EstudianteInscrito>>(
           stream: _estudiantes,
@@ -392,11 +416,16 @@ class _Sesion {
   final bool enCurso;
   final bool finalizado; // el período del curso ya terminó
 
+  /// Se puede tomar asistencia: es hoy, desde [Curso.minutosAntes] antes
+  /// del inicio hasta el final de la clase.
+  final bool disponible;
+
   const _Sesion({
     required this.fecha,
     required this.bloque,
     this.enCurso = false,
     this.finalizado = false,
+    this.disponible = false,
   });
 }
 
@@ -467,7 +496,22 @@ List<_Sesion> _proximasSesiones(Curso curso) {
     final enCurso =
         !ahora.isBefore(_conHora(dia, bloque.inicio)) &&
         ahora.isBefore(_conHora(dia, bloque.fin));
-    sesiones.add(_Sesion(fecha: dia, bloque: bloque, enCurso: enCurso));
+    final disponible =
+        !ahora.isBefore(
+          _conHora(
+            dia,
+            bloque.inicio,
+          ).subtract(const Duration(minutes: Curso.minutosAntes)),
+        ) &&
+        ahora.isBefore(_conHora(dia, bloque.fin));
+    sesiones.add(
+      _Sesion(
+        fecha: dia,
+        bloque: bloque,
+        enCurso: enCurso,
+        disponible: disponible,
+      ),
+    );
   }
   sesiones.sort(
     (a, b) => _conHora(
@@ -618,6 +662,20 @@ class _TarjetaSesion extends StatelessWidget {
   final VoidCallback onIniciar;
 
   static const _diasCortos = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
+  static const _mesesLargos = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+  ];
   static const _diasLargos = [
     'Lunes',
     'Martes',
@@ -753,11 +811,29 @@ class _TarjetaSesion extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    // Solo se abre la asistencia el día y la hora de la clase
                     _BotonVerde(
-                      icono: Icons.play_arrow_rounded,
+                      icono: sesion.disponible
+                          ? Icons.play_arrow_rounded
+                          : Icons.lock_clock,
                       texto: 'Iniciar clase',
-                      onPressed: sesion.finalizado ? null : onIniciar,
+                      onPressed: sesion.disponible ? onIniciar : null,
                     ),
+                    if (!sesion.disponible && !sesion.finalizado) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Se habilita el ${_diasLargos[indiceDia].toLowerCase()} '
+                        '${sesion.fecha.day} de '
+                        '${_mesesLargos[sesion.fecha.month - 1]}, '
+                        '${Curso.minutosAntes} min antes de las '
+                        '${_hora12(sesion.bloque.inicio)}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

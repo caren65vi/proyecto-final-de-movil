@@ -160,12 +160,86 @@ function bloqueDeAhora(horario) {
   const dia = diaJs === 0 ? 7 : diaJs; // 1 = lunes ... 7 = domingo
   const minutos = ahora.getUTCHours() * 60 + ahora.getUTCMinutes();
   for (const b of horario || []) {
-    const desde = aMinutos(b.inicio) - MINUTOS_ANTES;
-    if (b.dia === dia && minutos >= desde && minutos <= aMinutos(b.fin)) {
-      return b;
+    if (b.dia === dia && enVentana(b, minutos)) return b;
+  }
+  return null;
+}
+
+/**
+ * El minuto del día está entre MINUTOS_ANTES del inicio y el fin.
+ * @param {object} clase {inicio, fin} en HH:MM.
+ * @param {number} minutos Minutos desde la medianoche (hora de Colombia).
+ * @return {boolean} true si se puede tomar asistencia.
+ */
+function enVentana(clase, minutos) {
+  const desde = aMinutos(clase.inicio) - MINUTOS_ANTES;
+  return minutos >= desde && minutos <= aMinutos(clase.fin);
+}
+
+/**
+ * Fecha de Colombia ("AAAA-MM-DD") de un instante.
+ * @param {number} ms Milisegundos desde 1970.
+ * @return {string} Fecha.
+ */
+function diaColombia(ms) {
+  return new Date(ms + DESFASE_COLOMBIA_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * Hoy está dentro del período del curso (de fechaInicio a fechaFin).
+ * @param {object} grupo Datos del grupo.
+ * @return {boolean} true si hoy hay clases del curso.
+ */
+function enPeriodo(grupo) {
+  if (!grupo.fechaInicio || !grupo.fechaFin) return true;
+  const hoy = diaColombia(Date.now());
+  return (
+    hoy >= diaColombia(grupo.fechaInicio.toMillis()) &&
+    hoy <= diaColombia(grupo.fechaFin.toMillis())
+  );
+}
+
+/**
+ * Clase de este momento, solo si el curso está en su período: un bloque
+ * del horario semanal o una clase de recuperación programada para hoy.
+ * @param {object} grupoRef Referencia al grupo.
+ * @param {object} grupo Datos del grupo.
+ * @return {Promise<object|null>} {inicio, fin, recuperacionId?} o null.
+ */
+async function claseDeAhora(grupoRef, grupo) {
+  if (!enPeriodo(grupo)) return null;
+  const bloque = bloqueDeAhora(grupo.horario);
+  if (bloque) return bloque;
+
+  // Clase de recuperación de hoy (fecha "AAAA-MM-DD" en hora de Colombia)
+  const ahora = new Date(Date.now() + DESFASE_COLOMBIA_MS);
+  const minutos = ahora.getUTCHours() * 60 + ahora.getUTCMinutes();
+  const recuperaciones = await grupoRef
+      .collection("recuperaciones")
+      .where("fecha", "==", diaColombia(Date.now()))
+      .get();
+  for (const doc of recuperaciones.docs) {
+    const r = doc.data();
+    if (enVentana(r, minutos)) {
+      return {inicio: r.inicio, fin: r.fin, recuperacionId: doc.id};
     }
   }
   return null;
+}
+
+/**
+ * La sesión es de la clase de ahora: se abrió hoy y en el mismo bloque.
+ * @param {object} sesion Datos de la sesión.
+ * @param {object|null} bloque Bloque de ahora (claseDeAhora).
+ * @return {boolean} true si la sesión sigue vigente.
+ */
+function esSesionDeAhora(sesion, bloque) {
+  if (!bloque || !sesion.fecha) return false;
+  return (
+    diaColombia(sesion.fecha.toMillis()) === diaColombia(Date.now()) &&
+    sesion.inicio === bloque.inicio &&
+    sesion.fin === bloque.fin
+  );
 }
 
 /**
@@ -354,7 +428,7 @@ exports.verificarCodigo = onCall(async (request) => {
 });
 
 // ---------------------------------------------------------------------
-// abrirSesion: { grupoId, horas? } -> { sesionId, token }
+// abrirSesion: { grupoId } -> { sesionId, token }
 // ---------------------------------------------------------------------
 exports.abrirSesion = onCall(async (request) => {
   const auth = exigirSesion(request);
@@ -367,24 +441,36 @@ exports.abrirSesion = onCall(async (request) => {
       .where("estado", "==", "abierta")
       .limit(1)
       .get();
+  const bloque = await claseDeAhora(grupo.ref, grupo.datos);
   if (!abiertas.empty) {
     const sesion = abiertas.docs[0];
-    const qr = await sesion.ref.collection("privado").doc("qr").get();
-    return {sesionId: sesion.id, token: qr.get("token")};
+    if (esSesionDeAhora(sesion.data(), bloque)) {
+      const qr = await sesion.ref.collection("privado").doc("qr").get();
+      return {sesionId: sesion.id, token: qr.get("token")};
+    }
+    // Quedó abierta de una clase anterior: se cierra (los que no
+    // escanearon quedan ausentes) y no se vuelve a usar
+    await finalizarSesion(
+        grupo,
+        {ref: sesion.ref, datos: sesion.data()},
+        {grupoId: datos.grupoId, sesionId: sesion.id},
+    );
   }
 
-  const bloque = bloqueDeAhora(grupo.datos.horario);
-  let horas;
-  if (bloque) {
-    horas = (aMinutos(bloque.fin) - aMinutos(bloque.inicio)) / 60;
-  } else if (typeof datos.horas === "number" && datos.horas > 0) {
-    horas = datos.horas; // clase de recuperación fuera del horario
-  } else {
+  // Solo se toma asistencia el día y la hora de la clase
+  if (!enPeriodo(grupo.datos)) {
+    throw new HttpsError(
+        "failed-precondition",
+        "El curso no está dentro de su período de clases",
+    );
+  }
+  if (!bloque) {
     throw new HttpsError(
         "failed-precondition",
         "Ahora no hay clase de este curso según el horario",
     );
   }
+  const horas = (aMinutos(bloque.fin) - aMinutos(bloque.inicio)) / 60;
 
   const ref = sesiones.doc();
   const token = nuevoToken();
@@ -392,14 +478,16 @@ exports.abrirSesion = onCall(async (request) => {
   lote.set(ref, {
     grupoId: datos.grupoId,
     fecha: FieldValue.serverTimestamp(),
-    inicio: bloque ? bloque.inicio : null,
-    fin: bloque ? bloque.fin : null,
+    inicio: bloque.inicio,
+    fin: bloque.fin,
     horas,
     estado: "abierta",
     presentes: 0,
     ausentes: 0,
     justificadas: 0,
     abiertaPor: auth.uid,
+    // Si es una clase de recuperación, cuál (null = horario normal)
+    recuperacionId: bloque.recuperacionId || null,
   });
   lote.set(ref.collection("privado").doc("qr"), {
     token,
@@ -473,6 +561,13 @@ exports.registrarAsistenciaQR = onCall(async (request) => {
 
   // 2. La sesión sigue abierta
   const sesion = await sesionAbierta(grupoRef, datos.sesionId);
+  const claseActual = await claseDeAhora(grupoRef, grupoSnap.data());
+  if (!esSesionDeAhora(sesion.datos, claseActual)) {
+    throw new HttpsError(
+        "failed-precondition",
+        "La clase de esta asistencia ya terminó",
+    );
+  }
   if (typeof datos.token !== "string" || !datos.token) {
     throw new HttpsError("invalid-argument", "Falta el código QR");
   }
@@ -556,7 +651,19 @@ exports.cerrarSesion = onCall(async (request) => {
   const datos = request.data || {};
   const grupo = await grupoDelDocente(datos.grupoId, auth.uid);
   const sesion = await sesionAbierta(grupo.ref, datos.sesionId);
+  return finalizarSesion(grupo, sesion, datos);
+});
 
+/**
+ * Cierra una sesión: marca ausentes a quienes no escanearon y suma
+ * las horas y los totales. La usan cerrarSesion y abrirSesion (para
+ * cerrar una sesión que quedó abierta de una clase anterior).
+ * @param {object} grupo {ref, datos} del grupo.
+ * @param {object} sesion {ref, datos} de la sesión abierta.
+ * @param {object} datos {grupoId, sesionId}.
+ * @return {Promise<object>} Conteo {presente, ausente, justificada}.
+ */
+async function finalizarSesion(grupo, sesion, datos) {
   // 1. Primero se cierra la sesión (transacción). registrarAsistenciaQR
   // también lee la sesión en su transacción, así que después de esto
   // ningún estudiante puede registrarse y las cuentas no cambian.
@@ -644,7 +751,7 @@ exports.cerrarSesion = onCall(async (request) => {
     );
   }
   return conteo;
-});
+}
 
 // ---------------------------------------------------------------------
 // corregirAsistencia: se ejecuta sola cuando el docente cambia el estado

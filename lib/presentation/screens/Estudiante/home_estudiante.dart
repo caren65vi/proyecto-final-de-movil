@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../domain/entities/materia_estudiante.dart';
 import '../../../domain/entities/usuario.dart';
 import '../../../domain/usecases/auth_usecases.dart';
+import '../../../domain/usecases/facultad_usecases.dart';
 import '../../../domain/usecases/inscripcion_usecases.dart';
 import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
@@ -20,12 +21,20 @@ class HomeEstudianteScreen extends StatefulWidget {
     required this.cerrarSesion,
     required this.obtenerMisMaterias,
     required this.enlazarCuenta,
+    required this.obtenerFacultades,
+    required this.obtenerProgramas,
+    required this.asignarPrograma,
   });
 
   final Usuario usuario;
   final CerrarSesion cerrarSesion;
   final ObtenerMisMaterias obtenerMisMaterias;
   final EnlazarCuenta enlazarCuenta;
+
+  // Para que el estudiante elija su facultad y programa en el Perfil
+  final ObtenerFacultades obtenerFacultades;
+  final ObtenerProgramas obtenerProgramas;
+  final AsignarProgramaEstudiante asignarPrograma;
 
   @override
   State<HomeEstudianteScreen> createState() => _HomeEstudianteScreenState();
@@ -216,6 +225,9 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
             PerfilEstudiante(
               usuario: widget.usuario,
               onCerrarSesion: _cerrarSesion,
+              obtenerFacultades: widget.obtenerFacultades,
+              obtenerProgramas: widget.obtenerProgramas,
+              asignarPrograma: widget.asignarPrograma,
             ),
           ],
         ),

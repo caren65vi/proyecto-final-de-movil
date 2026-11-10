@@ -1,5 +1,6 @@
 import '../entities/curso.dart';
 import '../entities/estudiante_inscrito.dart';
+import '../entities/recuperacion.dart';
 import '../repositories/curso_repository.dart';
 
 /// Casos de uso de cursos: validan los datos y llaman al repositorio.
@@ -124,4 +125,85 @@ class QuitarEstudiante {
 
   Future<void> call(String grupoId, String correo) =>
       repositorio.quitarEstudiante(grupoId, correo);
+}
+
+// ---------- Clases de recuperación ----------
+
+class ObtenerRecuperaciones {
+  final CursoRepository repositorio;
+  ObtenerRecuperaciones(this.repositorio);
+
+  Stream<List<Recuperacion>> call(String grupoId) =>
+      repositorio.recuperaciones(grupoId);
+}
+
+/// Programa una clase de recuperación. Solo se acepta si cae dentro del
+/// período del curso, todavía no ha pasado y no choca con el horario normal.
+class ProgramarRecuperacion {
+  final CursoRepository repositorio;
+  ProgramarRecuperacion(this.repositorio);
+
+  static const largoMaximoMotivo = 120;
+
+  static int _minutos(String hora) {
+    final partes = hora.split(':');
+    return int.parse(partes[0]) * 60 + int.parse(partes[1]);
+  }
+
+  Future<void> call(
+    Curso curso,
+    Recuperacion recuperacion,
+    String docenteUid,
+  ) async {
+    final desde = _minutos(recuperacion.inicio);
+    final hasta = _minutos(recuperacion.fin);
+    if (hasta <= desde) {
+      throw const CursoError('La hora de fin debe ser después del inicio');
+    }
+    if (!curso.enPeriodo(recuperacion.fecha)) {
+      throw const CursoError(
+        'La fecha debe estar dentro del período del curso',
+      );
+    }
+    if (recuperacion.yaPaso()) {
+      throw const CursoError('Esa fecha y hora ya pasaron');
+    }
+    if (recuperacion.motivo.length > largoMaximoMotivo) {
+      throw const CursoError(
+        'El motivo no puede tener más de $largoMaximoMotivo caracteres',
+      );
+    }
+    // No puede cruzarse con una clase normal de ese mismo día
+    for (final bloque in curso.horario) {
+      if (bloque.dia != recuperacion.fecha.weekday) continue;
+      final cruza =
+          desde < _minutos(bloque.fin) && hasta > _minutos(bloque.inicio);
+      if (cruza) {
+        throw CursoError(
+          'Se cruza con la clase normal de ${bloque.inicio} a ${bloque.fin}',
+        );
+      }
+    }
+    if (curso.id == null) {
+      throw const CursoError('El curso todavía no se ha guardado');
+    }
+    await repositorio.programarRecuperacion(
+      curso.id!,
+      Recuperacion(
+        fecha: recuperacion.fecha,
+        inicio: recuperacion.inicio,
+        fin: recuperacion.fin,
+        motivo: recuperacion.motivo.trim(),
+      ),
+      docenteUid,
+    );
+  }
+}
+
+class EliminarRecuperacion {
+  final CursoRepository repositorio;
+  EliminarRecuperacion(this.repositorio);
+
+  Future<void> call(String grupoId, String recuperacionId) =>
+      repositorio.eliminarRecuperacion(grupoId, recuperacionId);
 }

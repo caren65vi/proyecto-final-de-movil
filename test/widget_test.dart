@@ -5,6 +5,8 @@ import 'package:ceiba/domain/entities/asistencia.dart';
 import 'package:ceiba/domain/entities/curso.dart';
 import 'package:ceiba/domain/entities/estudiante_inscrito.dart';
 import 'package:ceiba/domain/entities/facultad.dart';
+import 'package:ceiba/domain/entities/programa.dart';
+import 'package:ceiba/domain/entities/recuperacion.dart';
 import 'package:ceiba/domain/repositories/facultad_repository.dart';
 import 'package:ceiba/domain/entities/materia_estudiante.dart';
 import 'package:ceiba/domain/entities/sesion.dart';
@@ -94,6 +96,23 @@ class FakeCursoRepository implements CursoRepository {
       throw UnimplementedError();
 
   @override
+  Stream<List<Recuperacion>> recuperaciones(String grupoId) =>
+      Stream.value(const []);
+
+  @override
+  Future<void> programarRecuperacion(
+    String grupoId,
+    Recuperacion recuperacion,
+    String docenteUid,
+  ) async {}
+
+  @override
+  Future<void> eliminarRecuperacion(
+    String grupoId,
+    String recuperacionId,
+  ) async {}
+
+  @override
   Future<({double latitud, double longitud})> obtenerUbicacionActual() async =>
       (latitud: 1.619816, longitud: -75.604029);
 
@@ -153,6 +172,35 @@ class FakeFacultadRepository implements FacultadRepository {
     required String nombre,
     required String docenteUid,
   }) async => Facultad(id: id, nombre: nombre, creadaPor: docenteUid);
+
+  @override
+  Stream<List<Programa>> programas(String facultadId) => Stream.value(const []);
+
+  @override
+  Future<int> contarProgramas(String facultadId) async => 0;
+
+  @override
+  Future<Programa> crearPrograma({
+    required String facultadId,
+    required String id,
+    required String nombre,
+    required String docenteUid,
+  }) async => Programa(
+    id: id,
+    facultadId: facultadId,
+    nombre: nombre,
+    creadaPor: docenteUid,
+  );
+
+  @override
+  Future<void> eliminarPrograma(String facultadId, String programaId) async {}
+
+  @override
+  Future<void> asignarProgramaEstudiante({
+    required String uid,
+    required Facultad facultad,
+    required Programa programa,
+  }) async {}
 
   @override
   Future<void> eliminarFacultad(String id) async {}

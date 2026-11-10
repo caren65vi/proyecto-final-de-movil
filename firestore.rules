@@ -51,6 +51,22 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos);
     }
 
+    // Campos del estudiante que se pueden editar, con su facultad y programa
+    function camposEstudiante() {
+      return ['nombre', 'codigoEstudiante',
+              'facultadId', 'facultadNombre', 'programaId', 'programaNombre'];
+    }
+
+    // La facultad y el programa guardados existen y están enlazados
+    function programaValido() {
+      let d = request.resource.data;
+      return d.facultadId is string
+          && d.programaId is string
+          && d.facultadNombre is string
+          && d.programaNombre is string
+          && exists(/databases/$(database)/documents/facultades/$(d.facultadId)/programas/$(d.programaId));
+    }
+
     // ---------- usuarios ----------
 
     match /usuarios/{uid} {
@@ -70,13 +86,20 @@ service cloud.firestore {
 
       // Cada usuario edita su nombre y su código, nunca su rol;
       // el docente edita (nombre y código, nunca el rol) o elimina,
-      // y solo a estudiantes
+      // y solo a estudiantes.
+      // El estudiante (o un docente por él) elige su facultad y programa:
+      // el programa tiene que existir dentro de esa facultad.
       allow update: if (autenticado()
                         && request.auth.uid == uid
-                        && soloCambia(['nombre', 'codigoEstudiante']))
+                        && (soloCambia(['nombre', 'codigoEstudiante'])
+                            || (resource.data.rol == 'estudiante'
+                                && soloCambia(camposEstudiante())
+                                && programaValido())))
                     || (esDocente()
                         && resource.data.rol == 'estudiante'
-                        && soloCambia(['nombre', 'codigoEstudiante']));
+                        && (soloCambia(['nombre', 'codigoEstudiante'])
+                            || (soloCambia(camposEstudiante())
+                                && programaValido())));
 
       allow delete: if esDocente() && resource.data.rol == 'estudiante';
     }
@@ -124,6 +147,23 @@ service cloud.firestore {
       // Solo quien la creó la puede borrar; no se edita
       allow update: if false;
       allow delete: if esDocente() && resource.data.creadaPor == request.auth.uid;
+
+      // ----- programas de la facultad (ID = nombre sin tildes) -----
+      match /programas/{programaId} {
+        allow read: if autenticado();
+
+        allow create: if esDocente()
+                      && exists(/databases/$(database)/documents/facultades/$(facultadId))
+                      && request.resource.data.keys().hasOnly(['nombre', 'creadaPor', 'creadaEn'])
+                      && request.resource.data.nombre is string
+                      && request.resource.data.nombre.size() > 0
+                      && request.resource.data.nombre.size() <= 80
+                      && request.resource.data.creadaPor == request.auth.uid
+                      && request.resource.data.creadaEn == request.time;
+
+        allow update: if false;
+        allow delete: if esDocente() && resource.data.creadaPor == request.auth.uid;
+      }
     }
 
     // ---------- grupos ----------
@@ -185,6 +225,33 @@ service cloud.firestore {
                           && soloCambia(['uid', 'codigoEstudiante'])
                           && request.resource.data.uid == request.auth.uid);
 
+        allow delete: if esDueno(grupoId);
+      }
+
+      // ----- clases de recuperación (fuera del horario normal) -----
+      // El docente las programa con fecha y hora; el servidor solo deja
+      // abrir la asistencia dentro de esa ventana.
+
+      match /recuperaciones/{recuperacionId} {
+
+        allow read: if esDueno(grupoId) || estaInscrito(grupoId);
+
+        allow create: if esDueno(grupoId)
+                      && request.resource.data.keys().hasOnly(['fecha', 'inicio', 'fin', 'motivo', 'creadaPor', 'creadaEn'])
+                      && request.resource.data.fecha is string
+                      && request.resource.data.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+                      && request.resource.data.inicio is string
+                      && request.resource.data.inicio.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+                      && request.resource.data.fin is string
+                      && request.resource.data.fin.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+                      && request.resource.data.inicio < request.resource.data.fin
+                      && request.resource.data.motivo is string
+                      && request.resource.data.motivo.size() <= 120
+                      && request.resource.data.creadaPor == request.auth.uid
+                      && request.resource.data.creadaEn == request.time;
+
+        // No se editan: si cambia la fecha se borra y se programa otra
+        allow update: if false;
         allow delete: if esDueno(grupoId);
       }
 

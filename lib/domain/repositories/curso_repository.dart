@@ -1,5 +1,6 @@
 import '../entities/curso.dart';
 import '../entities/estudiante_inscrito.dart';
+import '../entities/recuperacion.dart';
 
 /// Error con un mensaje listo para mostrar al docente.
 class CursoError implements Exception {
@@ -32,6 +33,19 @@ abstract class CursoRepository {
 
   /// Quita un estudiante de la lista de clase.
   Future<void> quitarEstudiante(String grupoId, String correo);
+
+  /// Clases de recuperación del curso, en tiempo real.
+  Stream<List<Recuperacion>> recuperaciones(String grupoId);
+
+  /// Programa una clase de recuperación (fecha y hora fuera del horario).
+  Future<void> programarRecuperacion(
+    String grupoId,
+    Recuperacion recuperacion,
+    String docenteUid,
+  );
+
+  /// Elimina una clase de recuperación programada.
+  Future<void> eliminarRecuperacion(String grupoId, String recuperacionId);
 
   /// Ubicación actual del celular (pide permiso si hace falta).
   Future<({double latitud, double longitud})> obtenerUbicacionActual();

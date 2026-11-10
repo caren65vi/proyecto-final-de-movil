@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import '../../domain/entities/curso.dart';
 import '../../domain/entities/estudiante_inscrito.dart';
+import '../../domain/entities/recuperacion.dart';
 import '../../domain/repositories/curso_repository.dart';
 import '../datasources/curso_datasource.dart';
 import '../datasources/lista_estudiantes_datasource.dart';
@@ -95,6 +96,30 @@ class CursoRepositoryImpl implements CursoRepository {
     String grupoId,
     EstudianteInscrito estudiante,
   ) => _ejecutar(() => cursoDatasource.agregarEstudiante(grupoId, estudiante));
+
+  @override
+  Stream<List<Recuperacion>> recuperaciones(String grupoId) => cursoDatasource
+      .recuperaciones(grupoId)
+      .handleError((Object error) => throw _traducir(error));
+
+  @override
+  Future<void> programarRecuperacion(
+    String grupoId,
+    Recuperacion recuperacion,
+    String docenteUid,
+  ) => _ejecutar(
+    () => cursoDatasource.programarRecuperacion(
+      grupoId,
+      recuperacion,
+      docenteUid,
+    ),
+  );
+
+  @override
+  Future<void> eliminarRecuperacion(String grupoId, String recuperacionId) =>
+      _ejecutar(
+        () => cursoDatasource.eliminarRecuperacion(grupoId, recuperacionId),
+      );
 
   @override
   Future<void> quitarEstudiante(String grupoId, String correo) =>

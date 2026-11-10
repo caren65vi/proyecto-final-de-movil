@@ -9,6 +9,10 @@ class UsuarioModel extends Usuario {
     required super.correo,
     required super.rol,
     required super.fechaCreacion,
+    super.facultadId,
+    super.facultadNombre,
+    super.programaId,
+    super.programaNombre,
   });
 
   // Convierte un documento de Firestore en un UsuarioModel
@@ -23,6 +27,10 @@ class UsuarioModel extends Usuario {
       rol: data['rol'] ?? '',
       fechaCreacion:
           (data['fechaCreacion'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      facultadId: data['facultadId'] as String?,
+      facultadNombre: data['facultadNombre'] as String?,
+      programaId: data['programaId'] as String?,
+      programaNombre: data['programaNombre'] as String?,
     );
   }
 

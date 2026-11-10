@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../domain/entities/curso.dart';
 import '../../domain/entities/estudiante_inscrito.dart';
+import '../../domain/entities/recuperacion.dart';
+import '../models/recuperacion_model.dart';
 import '../../domain/repositories/curso_repository.dart';
 import '../models/curso_model.dart';
 import '../models/estudiante_inscrito_model.dart';
@@ -107,6 +109,35 @@ class CursoDatasource {
       .snapshots()
       .where((doc) => doc.exists)
       .map(CursoModel.fromFirestore);
+
+  // Clases de recuperación del curso, ordenadas por fecha y hora
+  Stream<List<Recuperacion>> recuperaciones(String grupoId) => _grupos
+      .doc(grupoId)
+      .collection('recuperaciones')
+      .snapshots()
+      .map((snapshot) {
+        final lista = snapshot.docs
+            .map(RecuperacionModel.fromFirestore)
+            .toList();
+        lista.sort((a, b) => a.empieza.compareTo(b.empieza));
+        return lista;
+      });
+
+  Future<void> programarRecuperacion(
+    String grupoId,
+    Recuperacion recuperacion,
+    String docenteUid,
+  ) => _grupos
+      .doc(grupoId)
+      .collection('recuperaciones')
+      .add(RecuperacionModel.toMap(recuperacion, docenteUid));
+
+  Future<void> eliminarRecuperacion(String grupoId, String recuperacionId) =>
+      _grupos
+          .doc(grupoId)
+          .collection('recuperaciones')
+          .doc(recuperacionId)
+          .delete();
 
   //Lista de clase ordenada por nombre
 
