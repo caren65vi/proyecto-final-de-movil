@@ -38,6 +38,9 @@ const MINUTOS_CODIGO = 10; // vigencia
 const MAX_INTENTOS = 5; // intentos fallidos antes de pedir otro
 const SEGUNDOS_REENVIO = 60; // espera mínima entre envíos
 
+// Minutos que dura un QR de inscripción (la pantalla lo renueva antes)
+const MINUTOS_INSCRIPCION = 5;
+
 // Campo que suma horas según el estado de la asistencia
 const CAMPO_HORAS = {
   presente: "horasAsistidas",
@@ -425,6 +428,120 @@ exports.verificarCodigo = onCall(async (request) => {
 
   await getAuth().updateUser(auth.uid, {emailVerified: true});
   return {ok: true};
+});
+
+// ---------------------------------------------------------------------
+// Inscripción por QR: el docente muestra un código y el estudiante lo
+// escanea. No pide ubicación. Cada código sirve para un solo estudiante
+// (después de usarse cambia) y vence a los pocos minutos.
+// ---------------------------------------------------------------------
+
+/**
+ * Documento con el token de inscripción del grupo.
+ * @param {object} grupoRef Referencia del grupo.
+ * @return {object} Referencia de grupos/{id}/privado/inscripcion.
+ */
+function refInscripcionQR(grupoRef) {
+  return grupoRef.collection("privado").doc("inscripcion");
+}
+
+/**
+ * Datos de un token de inscripción nuevo.
+ * @return {object} {token, venceEn, actualizadoEn}
+ */
+function nuevaInscripcionQR() {
+  return {
+    token: nuevoToken(),
+    venceEn: Timestamp.fromMillis(Date.now() + MINUTOS_INSCRIPCION * 60000),
+    actualizadoEn: FieldValue.serverTimestamp(),
+  };
+}
+
+// abrirInscripcionQR: { grupoId } -> { token }
+exports.abrirInscripcionQR = onCall(async (request) => {
+  const auth = exigirSesion(request);
+  const datos = request.data || {};
+  const grupo = await grupoDelDocente(datos.grupoId, auth.uid);
+
+  const nueva = nuevaInscripcionQR();
+  await refInscripcionQR(grupo.ref).set(nueva);
+  return {token: nueva.token};
+});
+
+// inscribirseConQR: { grupoId, token } -> { nombreMateria }
+exports.inscribirseConQR = onCall(async (request) => {
+  const auth = exigirSesion(request);
+  if (auth.token.email_verified !== true || !auth.token.email) {
+    throw new HttpsError("permission-denied", "Verifica tu correo primero");
+  }
+  const correo = auth.token.email.toLowerCase();
+  const datos = request.data || {};
+  if (
+    typeof datos.grupoId !== "string" ||
+    !datos.grupoId ||
+    typeof datos.token !== "string" ||
+    !datos.token
+  ) {
+    throw new HttpsError("invalid-argument", "El código QR está incompleto");
+  }
+
+  // Solo los estudiantes se inscriben; el nombre sale de su perfil
+  const usuario = await db.collection("usuarios").doc(auth.uid).get();
+  if (!usuario.exists || usuario.get("rol") !== "estudiante") {
+    throw new HttpsError(
+        "permission-denied",
+        "Solo los estudiantes pueden inscribirse a una clase",
+    );
+  }
+
+  const grupoRef = db.collection("grupos").doc(datos.grupoId);
+  const inscripcionRef = grupoRef.collection("inscripciones").doc(correo);
+  const qrRef = refInscripcionQR(grupoRef);
+
+  return db.runTransaction(async (t) => {
+    const [grupo, qr, existente] = await Promise.all([
+      t.get(grupoRef),
+      t.get(qrRef),
+      t.get(inscripcionRef),
+    ]);
+    if (!grupo.exists) {
+      throw new HttpsError("not-found", "El curso no existe");
+    }
+    if (existente.exists) {
+      throw new HttpsError(
+          "already-exists",
+          "Ya estás inscrito en este curso",
+      );
+    }
+    if (!qr.exists || qr.get("token") !== datos.token) {
+      throw new HttpsError(
+          "failed-precondition",
+          "El código QR ya fue usado; escanea el código actualizado",
+      );
+    }
+    if (qr.get("venceEn").toMillis() < Date.now()) {
+      throw new HttpsError(
+          "failed-precondition",
+          "El código QR venció; pide al docente que muestre uno nuevo",
+      );
+    }
+
+    t.create(inscripcionRef, {
+      correo,
+      nombre: usuario.get("nombre") || "",
+      uid: auth.uid,
+      codigoEstudiante: usuario.get("codigoEstudiante") || null,
+      horasAsistidas: 0,
+      horasFalta: 0,
+      horasJustificadas: 0,
+      metodo: "qr",
+      fechaInscripcion: FieldValue.serverTimestamp(),
+    });
+    t.update(grupoRef, {totalEstudiantes: FieldValue.increment(1)});
+    // El código cambia para que el siguiente estudiante use otro
+    t.set(qrRef, nuevaInscripcionQR());
+    return {nombreMateria: grupo.get("nombreMateria") || ""};
+  });
 });
 
 // ---------------------------------------------------------------------

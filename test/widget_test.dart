@@ -93,6 +93,13 @@ class FakeCursoRepository implements CursoRepository {
   ) => throw UnimplementedError();
 
   @override
+  Future<String> abrirInscripcionQR(String grupoId) async => 'token-prueba';
+
+  @override
+  Stream<String> tokenInscripcionQR(String grupoId) =>
+      Stream.value('token-prueba');
+
+  @override
   Future<void> quitarEstudiante(String grupoId, String correo) =>
       throw UnimplementedError();
 
@@ -125,6 +132,12 @@ class FakeInscripcionRepository implements InscripcionRepository {
   @override
   Stream<List<MateriaEstudiante>> misMaterias(String correo) =>
       Stream.value(const []);
+
+  @override
+  Future<String> inscribirseConQR({
+    required String grupoId,
+    required String token,
+  }) async => 'Cálculo I';
 
   @override
   Future<void> enlazarCuenta(String correo, String uid) async {}

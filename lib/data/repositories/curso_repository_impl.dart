@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import '../../domain/entities/curso.dart';
@@ -60,6 +61,10 @@ class CursoRepositoryImpl implements CursoRepository {
   // Convierte cualquier error en un CursoError con mensaje en español
   CursoError _traducir(Object error) {
     if (error is CursoError) return error;
+    // Las Cloud Functions ya responden con el mensaje en español
+    if (error is FirebaseFunctionsException) {
+      return CursoError(error.message ?? 'Error del servidor (${error.code})');
+    }
     if (error is FirebaseException) {
       if (error.code == 'permission-denied') {
         return const CursoError('No tienes permiso para realizar esta acción');
@@ -87,6 +92,15 @@ class CursoRepositoryImpl implements CursoRepository {
       throw _traducir(error);
     }
   }
+
+  @override
+  Future<String> abrirInscripcionQR(String grupoId) =>
+      _ejecutar(() => cursoDatasource.abrirInscripcionQR(grupoId));
+
+  @override
+  Stream<String> tokenInscripcionQR(String grupoId) => cursoDatasource
+      .tokenInscripcionQR(grupoId)
+      .handleError((Object error) => throw _traducir(error));
 
   @override
   Future<void> editarCurso(Curso curso) =>

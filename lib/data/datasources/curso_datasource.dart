@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../domain/entities/curso.dart';
 import '../../domain/entities/estudiante_inscrito.dart';
@@ -27,6 +28,7 @@ class CursoDatasource {
   };
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   CollectionReference<Map<String, dynamic>> get _grupos =>
       _db.collection('grupos');
@@ -57,6 +59,22 @@ class CursoDatasource {
     lote.update(grupo, {'totalEstudiantes': FieldValue.increment(1)});
     await lote.commit();
   }
+
+  // El servidor crea el token del QR de inscripción
+  Future<String> abrirInscripcionQR(String grupoId) async {
+    final resultado = await _functions.httpsCallable('abrirInscripcionQR').call(
+      {'grupoId': grupoId},
+    );
+    return (resultado.data as Map)['token'] as String;
+  }
+
+  Stream<String> tokenInscripcionQR(String grupoId) => _grupos
+      .doc(grupoId)
+      .collection('privado')
+      .doc('inscripcion')
+      .snapshots()
+      .map((s) => s.data()?['token'] as String? ?? '')
+      .where((token) => token.isNotEmpty);
 
   // Borra la inscripción y resta 1 al total del curso en el mismo lote.
   Future<void> quitarEstudiante(String grupoId, String correo) async {

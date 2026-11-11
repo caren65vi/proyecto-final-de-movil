@@ -93,6 +93,12 @@ class RegistrarAsistenciaQR {
 
   Future<void> call(String contenidoQR) async {
     final partes = contenidoQR.split('|');
+    if (partes.first == 'ceiba-inscripcion') {
+      throw const AsistenciaError(
+        'Este código es para inscribirse. Usa "Inscribirme a una clase" '
+        'en la pestaña Cursos.',
+      );
+    }
     if (partes.length != 4 || partes[0] != 'ceiba') {
       throw const AsistenciaError('Este código QR no es de Ceiba');
     }

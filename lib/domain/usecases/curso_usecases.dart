@@ -119,6 +119,24 @@ class AgregarEstudiante {
   }
 }
 
+/// QR para que los estudiantes se inscriban solos al curso.
+class InscripcionQR {
+  final CursoRepository repositorio;
+  InscripcionQR(this.repositorio);
+
+  /// Texto que lleva el QR de inscripción.
+  static String contenido(String grupoId, String token) =>
+      'ceiba-inscripcion|$grupoId|$token';
+
+  /// Crea un código nuevo (también sirve para renovarlo antes de que venza).
+  Future<String> abrir(String grupoId) =>
+      repositorio.abrirInscripcionQR(grupoId);
+
+  /// Token actual; cambia cada vez que alguien se inscribe.
+  Stream<String> token(String grupoId) =>
+      repositorio.tokenInscripcionQR(grupoId);
+}
+
 class QuitarEstudiante {
   final CursoRepository repositorio;
   QuitarEstudiante(this.repositorio);

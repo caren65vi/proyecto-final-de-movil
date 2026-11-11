@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../domain/entities/materia_estudiante.dart';
 import '../models/curso_model.dart';
@@ -7,6 +8,16 @@ import '../models/estudiante_inscrito_model.dart';
 /// Habla con Firestore para las inscripciones del estudiante.
 class InscripcionDatasource {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+
+  // El servidor revisa el código y crea la inscripción
+  Future<String> inscribirseConQR(String grupoId, String token) async {
+    final resultado = await _functions.httpsCallable('inscribirseConQR').call({
+      'grupoId': grupoId,
+      'token': token,
+    });
+    return (resultado.data as Map)['nombreMateria'] as String? ?? '';
+  }
 
   // Todas las inscripciones de un correo, en cualquier curso
   Query<Map<String, dynamic>> _misInscripciones(String correo) =>

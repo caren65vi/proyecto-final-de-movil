@@ -3,12 +3,15 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../domain/entities/curso.dart';
 import '../../../domain/repositories/asistencia_repository.dart';
+import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/asistencia_usecases.dart';
+import '../../../domain/usecases/inscripcion_usecases.dart';
 import '../../theme/app_colors.dart';
 
 const _logo = 'assets/images/ceiba_logo.png';
 
-/// El estudiante escanea el QR del docente para registrar su asistencia.
+/// El estudiante escanea el QR del docente para registrar su asistencia
+/// o, si recibe [inscribirse], para inscribirse a una clase (sin ubicación).
 ///
 /// Cada QR sirve para un solo estudiante: si alguien ya lo usó, el servidor
 /// responde "El código QR ya fue usado" y ese mensaje llega hasta aquí a
@@ -18,9 +21,14 @@ class EscanearQrScreen extends StatefulWidget {
     super.key,
     required this.asistenciaRepository,
     this.cursos = const [],
+    this.inscribirse,
   });
 
   final AsistenciaRepository asistenciaRepository;
+
+  /// Si llega, la pantalla inscribe en vez de registrar asistencia.
+  /// Al inscribirse devuelve el nombre de la materia.
+  final InscribirseConQR? inscribirse;
 
   /// Cursos del estudiante; se usan para mostrar la clase en curso.
   final List<Curso> cursos;
@@ -37,6 +45,8 @@ class _EscanearQrScreenState extends State<EscanearQrScreen>
     vsync: this,
     duration: const Duration(milliseconds: 1800),
   )..repeat(reverse: true);
+
+  bool get _esInscripcion => widget.inscribirse != null;
 
   late final Curso? _claseEnCurso = widget.cursos
       .where((c) => c.bloqueEnCurso() != null)
@@ -62,11 +72,21 @@ class _EscanearQrScreenState extends State<EscanearQrScreen>
 
     var exito = false;
     String mensaje;
+    String? materia;
     try {
-      await _registrar(contenido);
+      if (_esInscripcion) {
+        materia = await widget.inscribirse!(contenido);
+        mensaje = materia.isEmpty
+            ? '¡Te inscribiste a la clase!'
+            : '¡Te inscribiste a $materia!';
+      } else {
+        await _registrar(contenido);
+        mensaje = '¡Asistencia registrada!';
+      }
       exito = true;
-      mensaje = '¡Asistencia registrada!';
     } on AsistenciaError catch (e) {
+      mensaje = e.mensaje;
+    } on CursoError catch (e) {
       mensaje = e.mensaje;
     }
     if (!mounted) return;
@@ -91,7 +111,7 @@ class _EscanearQrScreenState extends State<EscanearQrScreen>
     if (!mounted) return;
 
     if (exito) {
-      Navigator.pop(context, true);
+      Navigator.pop(context, _esInscripcion ? materia : true);
     } else {
       setState(() => _procesando = false);
       await _camara.start();
@@ -129,8 +149,10 @@ class _EscanearQrScreenState extends State<EscanearQrScreen>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                  const Text(
-                    'Escanear Asistencia',
+                  Text(
+                    _esInscripcion
+                        ? 'Inscribirme a una clase'
+                        : 'Escanear Asistencia',
                     style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 18,
@@ -146,7 +168,7 @@ class _EscanearQrScreenState extends State<EscanearQrScreen>
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          _tarjetaClase(curso),
+          _esInscripcion ? _tarjetaInscripcion() : _tarjetaClase(curso),
           const SizedBox(height: 16),
           _visor(),
           const SizedBox(height: 16),
@@ -157,19 +179,23 @@ class _EscanearQrScreenState extends State<EscanearQrScreen>
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.surfaceContainer),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.verified_user_outlined,
+                  _esInscripcion
+                      ? Icons.location_off_outlined
+                      : Icons.verified_user_outlined,
                   size: 16,
                   color: AppColors.primary,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    'Geolocalización activa en campus universitario',
-                    style: TextStyle(
+                    _esInscripcion
+                        ? 'No necesitas activar la ubicación para inscribirte'
+                        : 'Geolocalización activa en campus universitario',
+                    style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -198,6 +224,46 @@ class _EscanearQrScreenState extends State<EscanearQrScreen>
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tarjetaInscripcion() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.surfaceContainer),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'INSCRIPCIÓN A CLASE',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+          SizedBox(height: 10),
+          Text(
+            'Únete a un curso',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Pide a tu docente que te muestre el código de inscripción '
+            'del curso y apúntalo con la cámara.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
         ],
       ),
@@ -403,7 +469,9 @@ class _EscanearQrScreenState extends State<EscanearQrScreen>
                               const SizedBox(height: 8),
                               Text(
                                 _procesando
-                                    ? 'Registrando asistencia...'
+                                    ? (_esInscripcion
+                                          ? 'Inscribiendo...'
+                                          : 'Registrando asistencia...')
                                     : 'Buscando código QR...',
                                 style: const TextStyle(
                                   color: Colors.white,

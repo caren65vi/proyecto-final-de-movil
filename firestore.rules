@@ -230,6 +230,14 @@ service cloud.firestore {
         allow delete: if esDueno(grupoId);
       }
 
+      // ----- token del QR de inscripción: lo escribe el servidor -----
+      // Solo el docente lo lee para mostrarlo
+
+      match /privado/{documento} {
+        allow read: if esDueno(grupoId);
+        allow write: if false;
+      }
+
       // ----- clases de recuperación (fuera del horario normal) -----
       // El docente las programa con fecha y hora; el servidor solo deja
       // abrir la asistencia dentro de esa ventana.

@@ -141,6 +141,18 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
     arguments: [for (final m in _materias) m.curso],
   );
 
+  // Escanea el QR de inscripción del docente; la materia nueva aparece sola
+  // porque la lista de materias se escucha en tiempo real
+  Future<void> _inscribirme() async {
+    final materia = await Navigator.pushNamed(context, AppRoutes.inscribirseQR);
+    if (!mounted || materia is! String) return;
+    setState(() {
+      _pestana = 0;
+      _busquedaController.clear();
+      _diaSeleccionado = null;
+    });
+  }
+
   @override
   void dispose() {
     _suscripcion?.cancel();
@@ -303,6 +315,25 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
           ),
         ),
 
+        const SizedBox(height: 12),
+
+        OutlinedButton.icon(
+          onPressed: _inscribirme,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            side: const BorderSide(color: AppColors.primary),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.group_add_outlined, size: 20),
+          label: const Text(
+            'Inscribirme a una clase',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+
         const SizedBox(height: 16),
 
         // Buscador
@@ -395,7 +426,9 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
       return const [
         _Mensaje(
           icono: Icons.school_outlined,
-          texto: 'Aún no estás inscrito en ninguna materia',
+          texto:
+              'Aún no estás inscrito en ninguna materia. Toca '
+              '"Inscribirme a una clase" y escanea el código de tu docente.',
         ),
       ];
     }

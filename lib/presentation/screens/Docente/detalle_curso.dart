@@ -11,6 +11,7 @@ import '../../../routes/app_routes.dart';
 import '../../../core/utils/validator_form.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/mensaje_error.dart';
+import 'inscripcion_qr.dart' show agregarAMano;
 import 'recuperaciones_curso.dart';
 
 /// Gestionar clase: próximas sesiones del curso y estudiantes matriculados.
@@ -102,6 +103,25 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
       arguments: curso,
     );
     if (inicio == true) _mostrar('Sesión de asistencia cerrada');
+  }
+
+  // Se agrega con el QR de inscripción; si el estudiante no tiene la app,
+  // el docente puede escribir sus datos
+  Future<void> _inscribirConQR(Curso curso) async {
+    final resultado = await Navigator.pushNamed(
+      context,
+      AppRoutes.inscripcionQR,
+      arguments: curso,
+    );
+    if (resultado == agregarAMano) {
+      await _mostrarAgregar();
+    } else if (resultado is int && resultado > 0) {
+      _mostrar(
+        resultado == 1
+            ? '1 estudiante inscrito'
+            : '$resultado estudiantes inscritos',
+      );
+    }
   }
 
   // El diálogo valida los campos y muestra el error de Firestore adentro;
@@ -331,7 +351,7 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
                       icono: Icons.person_add_alt_1,
                       texto: 'Agregar\nAlumno',
                       alto: 40,
-                      onPressed: _mostrarAgregar,
+                      onPressed: () => _inscribirConQR(curso),
                     ),
                   ],
                 ),

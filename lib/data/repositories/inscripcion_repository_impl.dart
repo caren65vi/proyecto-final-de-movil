@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import '../../domain/entities/materia_estudiante.dart';
@@ -14,6 +15,10 @@ class InscripcionRepositoryImpl implements InscripcionRepository {
   // Convierte cualquier error en un CursoError con mensaje en español
   CursoError _traducir(Object error) {
     if (error is CursoError) return error;
+    // Las Cloud Functions ya responden con el mensaje en español
+    if (error is FirebaseFunctionsException) {
+      return CursoError(error.message ?? 'Error del servidor (${error.code})');
+    }
     if (error is FirebaseException) {
       if (error.code == 'permission-denied') {
         return const CursoError('No tienes permiso para ver tus materias');
@@ -32,6 +37,18 @@ class InscripcionRepositoryImpl implements InscripcionRepository {
   Stream<List<MateriaEstudiante>> misMaterias(String correo) => datasource
       .misMaterias(correo)
       .handleError((Object error) => throw _traducir(error));
+
+  @override
+  Future<String> inscribirseConQR({
+    required String grupoId,
+    required String token,
+  }) async {
+    try {
+      return await datasource.inscribirseConQR(grupoId, token);
+    } catch (error) {
+      throw _traducir(error);
+    }
+  }
 
   @override
   Future<void> enlazarCuenta(String correo, String uid) async {

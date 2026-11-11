@@ -32,6 +32,14 @@ abstract class CursoRepository {
   /// Agrega un estudiante a la lista de clase.
   Future<void> agregarEstudiante(String grupoId, EstudianteInscrito estudiante);
 
+  /// Crea un código nuevo para que los estudiantes se inscriban con QR.
+  /// Devuelve el token que va dentro del QR.
+  Future<String> abrirInscripcionQR(String grupoId);
+
+  /// Token actual del QR de inscripción. Cambia cada vez que un estudiante
+  /// se inscribe, así cada uno usa un código distinto.
+  Stream<String> tokenInscripcionQR(String grupoId);
+
   /// Quita un estudiante de la lista de clase.
   Future<void> quitarEstudiante(String grupoId, String correo);
 

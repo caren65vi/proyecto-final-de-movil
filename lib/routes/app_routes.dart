@@ -23,6 +23,7 @@ import '../presentation/screens/auth/verify_email_screen.dart';
 import '../presentation/screens/Docente/detalle_curso.dart';
 import '../presentation/screens/Docente/editar_curso.dart';
 import '../presentation/screens/Docente/asistencia_qr.dart';
+import '../presentation/screens/Docente/inscripcion_qr.dart';
 import '../presentation/screens/Estudiante/escanear_qr.dart';
 import '../domain/entities/curso.dart';
 
@@ -79,11 +80,19 @@ class AppRoutes {
   /// Argumento: el `Curso` del que se toma asistencia.
   static const String asistenciaQR = '/docente/asistencia';
 
+  /// Argumento: el `Curso` al que se inscriben los estudiantes con QR.
+  /// Devuelve cuántos se inscribieron, o `'manual'` para agregar a mano.
+  static const String inscripcionQR = '/docente/inscripcion';
+
   /// Argumento: `Usuario` (docente) que gestiona las facultades.
   static const String facultades = '/docente/facultades';
 
   /// Argumento opcional: `List<Curso>` del estudiante (para la clase en curso).
   static const String escanearQR = '/estudiante/escanear';
+
+  /// El estudiante escanea el QR de inscripción del docente.
+  /// Devuelve el nombre de la materia si quedó inscrito.
+  static const String inscribirseQR = '/estudiante/inscribirse';
 
   // ---------- Construcción de las pantallas ----------
 
@@ -148,9 +157,19 @@ class AppRoutes {
         cursoRepository: cursoRepository,
       ),
       asistenciaQR => _RutaNoEncontrada(nombre: settings.name),
+      inscripcionQR when args is Curso => InscripcionQrScreen(
+        curso: args,
+        inscripcionQR: InscripcionQR(cursoRepository),
+        obtenerEstudiantes: ObtenerEstudiantes(cursoRepository),
+      ),
+      inscripcionQR => _RutaNoEncontrada(nombre: settings.name),
       escanearQR => EscanearQrScreen(
         asistenciaRepository: asistenciaRepository,
         cursos: args is List<Curso> ? args : const [],
+      ),
+      inscribirseQR => EscanearQrScreen(
+        asistenciaRepository: asistenciaRepository,
+        inscribirse: InscribirseConQR(inscripcionRepository),
       ),
       editarCurso when args is Curso => EditarCursoScreen(
         curso: args,
