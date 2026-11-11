@@ -22,7 +22,7 @@ import 'package:ceiba/routes/app_routes.dart';
 class FakeAuthRepository implements AuthRepository {
   @override
   Future<Usuario> iniciarSesion(String correo, String contrasena) async {
-    if (contrasena != '123456') {
+    if (contrasena != 'clave1234') {
       throw const AuthError('Correo o contraseña incorrectos');
     }
     return Usuario(
@@ -351,6 +351,31 @@ void main() {
     expect(find.text('Correo o contraseña incorrectos'), findsOneWidget);
   });
 
+  testWidgets('Muestra bajo el campo el error de correo inválido', (
+    tester,
+  ) async {
+    await abrirLogin(tester);
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'caren@udla');
+    await tester.enterText(find.byType(TextFormField).at(1), '123');
+    await tester.tap(find.text('Iniciar sesión').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ingresa un correo válido'), findsOneWidget);
+    expect(
+      find.text('La contraseña debe tener al menos 8 caracteres'),
+      findsOneWidget,
+    );
+
+    // Al corregirlo, el error desaparece sin volver a tocar el botón
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'caren@udla.edu.co',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Ingresa un correo válido'), findsNothing);
+  });
+
   testWidgets('Da la bienvenida con nombre y rol al iniciar sesión', (
     tester,
   ) async {
@@ -360,7 +385,7 @@ void main() {
       find.byType(TextFormField).at(0),
       'caren@udla.edu.co',
     );
-    await tester.enterText(find.byType(TextFormField).at(1), '123456');
+    await tester.enterText(find.byType(TextFormField).at(1), 'clave1234');
     await tester.tap(find.text('Iniciar sesión').last);
     await tester.pumpAndSettle();
 

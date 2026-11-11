@@ -2,9 +2,12 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/validator_form.dart';
+
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/mensaje_error.dart';
 
 class RecoverPasswordScreen extends StatefulWidget {
   const RecoverPasswordScreen({
@@ -29,6 +32,12 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
 
   bool _loading = false;
 
+  // Tras el primer intento, el error del correo se actualiza al escribir
+  AutovalidateMode _autovalidar = AutovalidateMode.disabled;
+
+  // Error de Firebase al enviar el enlace, sobre el botón
+  String? _errorEnvio;
+
   // Correo al que se envió el enlace; null mientras se muestra el formulario
   String? _correoEnviado;
 
@@ -45,6 +54,10 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
   }
 
   Future<void> _enviar() async {
+    setState(() {
+      _autovalidar = AutovalidateMode.onUserInteraction;
+      _errorEnvio = null;
+    });
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -55,9 +68,13 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
       if (!mounted) return;
       setState(() => _correoEnviado = _emailController.text.trim());
     } on AuthError catch (e) {
-      _showError(e.mensaje);
+      if (mounted) setState(() => _errorEnvio = e.mensaje);
     } catch (_) {
-      _showError('Ocurrió un error inesperado. Intenta de nuevo.');
+      if (mounted) {
+        setState(
+          () => _errorEnvio = 'Ocurrió un error inesperado. Intenta de nuevo.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -88,6 +105,8 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
     setState(() {
       _correoEnviado = null;
       _emailController.clear();
+      _autovalidar = AutovalidateMode.disabled;
+      _errorEnvio = null;
     });
   }
 
@@ -322,6 +341,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
   Widget _buildForm() {
     return Form(
       key: _formKey,
+      autovalidateMode: _autovalidar,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -359,23 +379,18 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             autofillHints: const [AutofillHints.email],
+            autocorrect: false,
+            enableSuggestions: false,
             textInputAction: TextInputAction.send,
             onFieldSubmitted: (_) => _loading ? null : _enviar(),
+            onChanged: (_) {
+              if (_errorEnvio != null) setState(() => _errorEnvio = null);
+            },
             decoration: const InputDecoration(
               hintText: 'usuario@udla.edu.co',
               prefixIcon: Icon(Icons.school_outlined, size: 20),
             ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Ingresa tu correo institucional';
-              }
-
-              if (!value.contains('@')) {
-                return 'Ingresa un correo válido';
-              }
-
-              return null;
-            },
+            validator: ValidatorForm.validateEmail,
           ),
 
           const SizedBox(height: 6),
@@ -403,6 +418,11 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
           ),
 
           const SizedBox(height: 20),
+
+          if (_errorEnvio != null) ...[
+            MensajeError(texto: _errorEnvio!),
+            const SizedBox(height: 12),
+          ],
 
           SizedBox(
             height: 48,

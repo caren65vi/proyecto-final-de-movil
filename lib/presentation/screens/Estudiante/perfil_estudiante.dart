@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/utils/validator_form.dart';
 import '../../../domain/entities/facultad.dart';
 import '../../../domain/entities/programa.dart';
 import '../../../domain/entities/usuario.dart';
 import '../../../domain/repositories/facultad_repository.dart';
 import '../../../domain/usecases/facultad_usecases.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/mensaje_error.dart';
 
 // Tonos del diseño que no están en AppColors
 const Color _errorContainer = Color(0xFFFFDAD6);
@@ -407,6 +409,7 @@ class _DialogoProgramaState extends State<_DialogoPrograma> {
 
   void _cambiarFacultad(String? id) {
     setState(() {
+      _error = null;
       _facultadId = id;
       _programaId = null;
       _programas = id == null ? null : widget.obtenerProgramas(id);
@@ -419,8 +422,11 @@ class _DialogoProgramaState extends State<_DialogoPrograma> {
   ) async {
     final facultad = facultades.where((f) => f.id == _facultadId).firstOrNull;
     final programa = programas.where((p) => p.id == _programaId).firstOrNull;
-    if (facultad == null || programa == null) {
-      setState(() => _error = 'Elige la facultad y el programa');
+    final error =
+        ValidatorForm.validateSelection(facultad, 'Elige tu facultad') ??
+        ValidatorForm.validateSelection(programa, 'Elige tu programa');
+    if (error != null || facultad == null || programa == null) {
+      setState(() => _error = error);
       return;
     }
     setState(() {
@@ -437,12 +443,13 @@ class _DialogoProgramaState extends State<_DialogoPrograma> {
         Navigator.pop(context, (facultad: facultad, programa: programa));
       }
     } on FacultadError catch (e) {
+      if (mounted) setState(() => _error = e.mensaje);
+    } catch (_) {
       if (mounted) {
-        setState(() {
-          _guardando = false;
-          _error = e.mensaje;
-        });
+        setState(() => _error = 'No se pudo guardar. Intenta de nuevo.');
       }
+    } finally {
+      if (mounted) setState(() => _guardando = false);
     }
   }
 
@@ -514,18 +521,15 @@ class _DialogoProgramaState extends State<_DialogoPrograma> {
                       ],
                       onChanged: _guardando || facultadValida == null
                           ? null
-                          : (id) => setState(() => _programaId = id),
+                          : (id) => setState(() {
+                              _programaId = id;
+                              _error = null;
+                            }),
                     ),
                   ],
                   if (_error != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      _error!,
-                      style: const TextStyle(
-                        color: AppColors.error,
-                        fontSize: 12,
-                      ),
-                    ),
+                    const SizedBox(height: 12),
+                    MensajeError(texto: _error!),
                   ],
                 ],
               ),

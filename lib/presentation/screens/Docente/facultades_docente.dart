@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/validator_form.dart';
 import '../../../domain/entities/facultad.dart';
 import '../../../domain/entities/programa.dart';
 import '../../../domain/entities/usuario.dart';
@@ -372,6 +373,16 @@ class _DialogoNombreState<T> extends State<_DialogoNombre<T>> {
   }
 
   Future<void> _guardar() async {
+    // Primero se revisa aquí; el resto (ej. "ya existe") lo dice Firestore
+    final error = ValidatorForm.validateText(
+      _nombre.text,
+      mensaje: 'Escribe el nombre',
+      maximo: largoMaximoNombre,
+    );
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
     setState(() {
       _guardando = true;
       _error = null;
@@ -380,12 +391,13 @@ class _DialogoNombreState<T> extends State<_DialogoNombre<T>> {
       final creado = await widget.guardar(_nombre.text);
       if (mounted) Navigator.pop(context, creado);
     } on FacultadError catch (e) {
+      if (mounted) setState(() => _error = e.mensaje);
+    } catch (_) {
       if (mounted) {
-        setState(() {
-          _guardando = false;
-          _error = e.mensaje;
-        });
+        setState(() => _error = 'No se pudo guardar. Intenta de nuevo.');
       }
+    } finally {
+      if (mounted) setState(() => _guardando = false);
     }
   }
 
@@ -415,6 +427,10 @@ class _DialogoNombreState<T> extends State<_DialogoNombre<T>> {
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _guardando ? null : _guardar(),
+            // El error se quita al volver a escribir
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
             decoration: InputDecoration(
               hintText: widget.ejemplo,
               errorText: _error,

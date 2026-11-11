@@ -8,6 +8,7 @@ import '../../../domain/usecases/auth_usecases.dart';
 import '../../../domain/usecases/curso_usecases.dart';
 import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/encabezado_ceiba.dart';
 import 'estadisticas_docente.dart';
 import 'perfil_docente.dart';
 
@@ -34,8 +35,6 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
   // 0 = Inicio, 1 = Estadísticas, 2 = Perfil
   int _pestana = 0;
 
-  static const _titulos = ['Inicio', 'Estadísticas', 'Perfil'];
-
   // Se crea una sola vez; asBroadcastStream permite que varias pestañas lo escuchen
   late final Stream<List<Curso>> _misCursos;
 
@@ -45,6 +44,18 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
     _misCursos = widget
         .obtenerMisCursos(widget.usuario.uid)
         .asBroadcastStream();
+  }
+
+  // Nombre de cada pestaña (para el encabezado fuera de Inicio)
+  static const _titulos = ['Inicio', 'Estadísticas', 'Perfil'];
+
+  // La campana: todavía no hay un listado de notificaciones en la app
+  void _verNotificaciones() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('No tienes notificaciones nuevas')),
+      );
   }
 
   // Cierra la sesión en Firebase y deja solo el login en la pila
@@ -64,50 +75,57 @@ class _HomeDocenteScreenState extends State<HomeDocenteScreen> {
   Widget _buildScaffold() {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 1,
-        shadowColor: AppColors.primary.withValues(alpha: 0.08),
-        automaticallyImplyLeading: false,
-        titleSpacing: 12,
-        title: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                'assets/images/ceiba_logo.png',
-                width: 36,
-                height: 36,
-                fit: BoxFit.contain,
+      // El encabezado nuevo va solo en Inicio; las demás pestañas
+      // conservan el de antes, con el nombre de la sección
+      appBar: _pestana == 0
+          ? EncabezadoCeiba(
+              portal: 'Portal Docente',
+              onNotificaciones: _verNotificaciones,
+            )
+          : AppBar(
+              backgroundColor: AppColors.background,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 1,
+              shadowColor: AppColors.primary.withValues(alpha: 0.08),
+              automaticallyImplyLeading: false,
+              titleSpacing: 12,
+              title: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/images/ceiba_logo.png',
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Ceiba Docente',
+                        style: TextStyle(
+                          color: AppColors.primaryDark,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          height: 1.1,
+                        ),
+                      ),
+                      Text(
+                        _titulos[_pestana],
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Ceiba Docente',
-                  style: TextStyle(
-                    color: AppColors.primaryDark,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    height: 1.1,
-                  ),
-                ),
-                Text(
-                  _titulos[_pestana],
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
       // IndexedStack: las pestañas no se destruyen al cambiar y la consulta
       // de cursos no se reinicia
       body: IndexedStack(

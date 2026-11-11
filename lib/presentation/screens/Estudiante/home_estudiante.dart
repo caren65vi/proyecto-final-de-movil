@@ -9,6 +9,7 @@ import '../../../domain/usecases/facultad_usecases.dart';
 import '../../../domain/usecases/inscripcion_usecases.dart';
 import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/encabezado_ceiba.dart';
 import 'asistencia_estudiante.dart';
 import 'horario_estudiante.dart';
 import 'perfil_estudiante.dart';
@@ -69,12 +70,22 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
   bool _cargando = true;
   String? _error;
 
-  // Título de la cabecera según la pestaña (Cursos y Horario solo llevan el logo)
+  // Título del encabezado fuera de Cursos
   String? get _tituloCabecera => switch (_pestana) {
+    1 => 'Horario',
     2 => 'Asistencia',
     3 => 'Mi Perfil',
     _ => null,
   };
+
+  // La campana: todavía no hay un listado de notificaciones en la app
+  void _verNotificaciones() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('No tienes notificaciones nuevas')),
+      );
+  }
 
   // Primer nombre para el saludo (ej. "Camilo Pérez" → "Camilo")
   String get _primerNombre => widget.usuario.nombre.trim().split(' ').first;
@@ -110,17 +121,15 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
 
   // Materias que cumplen la búsqueda y el filtro por día
   List<MateriaEstudiante> get _materiasFiltradas {
-    final texto = _busquedaController.text.trim().toLowerCase();
+    final texto = _busquedaController.text;
     final dia = _diaSeleccionado == null
         ? null
         : _dias.indexOf(_diaSeleccionado!) + 1;
     return _materias.where((m) {
-      final c = m.curso;
-      final coincideTexto =
-          texto.isEmpty ||
-          c.nombreMateria.toLowerCase().contains(texto) ||
-          c.docenteNombre.toLowerCase().contains(texto);
-      final coincideDia = dia == null || c.horario.any((b) => b.dia == dia);
+      // Sin importar tildes, mayúsculas ni el orden de las palabras
+      final coincideTexto = m.coincideCon(texto);
+      final coincideDia =
+          dia == null || m.curso.horario.any((b) => b.dia == dia);
       return coincideTexto && coincideDia;
     }).toList();
   }
@@ -154,64 +163,71 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
       canPop: false,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
-          backgroundColor: AppColors.background,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 1,
-          shadowColor: AppColors.primary.withValues(alpha: 0.08),
-          automaticallyImplyLeading: false,
-          titleSpacing: 16,
-          title: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  'assets/images/ceiba_logo.png',
-                  width: 32,
-                  height: 32,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              // En Asistencia y Perfil la cabecera lleva el nombre de la sección
-              if (_tituloCabecera != null) ...[
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        // El encabezado nuevo va solo en Cursos (inicio); las demás
+        // pestañas conservan el de antes
+        appBar: _pestana == 0
+            ? EncabezadoCeiba(
+                portal: 'Portal Estudiante',
+                onNotificaciones: _verNotificaciones,
+              )
+            : AppBar(
+                backgroundColor: AppColors.background,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                scrolledUnderElevation: 1,
+                shadowColor: AppColors.primary.withValues(alpha: 0.08),
+                automaticallyImplyLeading: false,
+                titleSpacing: 16,
+                title: Row(
                   children: [
-                    const Text(
-                      'CEIBA',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1,
-                        height: 1,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(
+                        'assets/images/ceiba_logo.png',
+                        width: 32,
+                        height: 32,
+                        fit: BoxFit.contain,
                       ),
                     ),
-                    Text(
-                      _tituloCabecera!,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    // En Horario, Asistencia y Perfil lleva el nombre de la sección
+                    if (_tituloCabecera != null) ...[
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'CEIBA',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1,
+                              height: 1,
+                            ),
+                          ),
+                          Text(
+                            _tituloCabecera!,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
+                    ],
                   ],
                 ),
-              ],
-            ],
-          ),
-          actions: [
-            IconButton(
-              tooltip: 'Notificaciones',
-              onPressed: () {},
-              color: AppColors.textSecondary,
-              icon: const Icon(Icons.notifications_outlined, size: 22),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ),
+                actions: [
+                  IconButton(
+                    tooltip: 'Notificaciones',
+                    onPressed: _verNotificaciones,
+                    color: AppColors.textSecondary,
+                    icon: const Icon(Icons.notifications_outlined, size: 22),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ),
         body: IndexedStack(
           index: _pestana,
           children: [
@@ -293,6 +309,7 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
         TextField(
           controller: _busquedaController,
           textInputAction: TextInputAction.search,
+          textAlignVertical: TextAlignVertical.center,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             hintText: 'Buscar por materia o profesor...',
@@ -302,10 +319,20 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
               size: 20,
               color: AppColors.textSecondary,
             ),
+            // Botón para borrar la búsqueda
+            suffixIcon: _busquedaController.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Borrar búsqueda',
+                    icon: const Icon(Icons.close, size: 18),
+                    color: AppColors.textSecondary,
+                    onPressed: () =>
+                        setState(() => _busquedaController.clear()),
+                  ),
             filled: true,
             fillColor: AppColors.surfaceLow,
-            contentPadding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -374,10 +401,14 @@ class _HomeEstudianteScreenState extends State<HomeEstudianteScreen> {
     }
     final materias = _materiasFiltradas;
     if (materias.isEmpty) {
-      return const [
+      final busqueda = _busquedaController.text.trim();
+      return [
         _Mensaje(
           icono: Icons.search_off,
-          texto: 'Ninguna materia coincide con el filtro',
+          texto: busqueda.isEmpty
+              ? 'No tienes clases el $_diaSeleccionado'
+              : 'Ninguna materia ni profesor coincide con "$busqueda"'
+                    '${_diaSeleccionado == null ? '' : ' el $_diaSeleccionado'}',
         ),
       ];
     }

@@ -29,6 +29,7 @@ class CeibaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    
     // Se arman las capas: datasource → repositorio → rutas → pantallas
     final authRepository = AuthRepositoryImpl(AuthDatasource());
     final cursoRepository = CursoRepositoryImpl(

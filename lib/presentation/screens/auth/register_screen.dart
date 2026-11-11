@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/validator_form.dart';
+
 import '../../../domain/entities/facultad.dart';
 import '../../../domain/entities/programa.dart';
 import '../../../domain/repositories/auth_repository.dart';
@@ -7,6 +9,7 @@ import '../../../domain/usecases/auth_usecases.dart';
 import '../../../domain/usecases/facultad_usecases.dart';
 import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/mensaje_error.dart';
 
 enum UserRole { student, teacher }
 
@@ -61,6 +64,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscureConfirmPassword = true;
   bool _acceptTerms = false;
   bool _loading = false;
+
+  // Tras el primer intento, los errores se actualizan mientras escribe
+  AutovalidateMode _autovalidar = AutovalidateMode.disabled;
+
+  // Falta aceptar los términos (se muestra bajo la casilla)
+  bool _faltanTerminos = false;
+
+  // Error de Firebase (ej. correo ya registrado), sobre el botón
+  String? _errorRegistro;
+
+  void _limpiarErrorRegistro(String _) {
+    if (_errorRegistro != null) setState(() => _errorRegistro = null);
+  }
 
   @override
   void initState() {
@@ -132,18 +148,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _continueRegistration() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    if (!_acceptTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Debes aceptar el tratamiento de datos y el reglamento académico.',
-          ),
-        ),
-      );
+    setState(() {
+      _autovalidar = AutovalidateMode.onUserInteraction;
+      _errorRegistro = null;
+      _faltanTerminos = !_acceptTerms;
+    });
+    // Cada campo mal llenado muestra su error debajo
+    final formularioValido = _formKey.currentState!.validate();
+    if (!formularioValido || !_acceptTerms) {
       return;
     }
 
@@ -190,9 +202,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         arguments: _emailController.text.trim(),
       );
     } on AuthError catch (e) {
-      _showError(e.mensaje);
+      if (mounted) setState(() => _errorRegistro = e.mensaje);
     } catch (_) {
-      _showError('No se pudo crear la cuenta. Intenta de nuevo.');
+      if (mounted) {
+        setState(
+          () =>
+              _errorRegistro = 'No se pudo crear la cuenta. Intenta de nuevo.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -227,7 +244,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   DropdownMenuItem(value: f.id, child: Text(f.nombre)),
               ],
               onChanged: _loading ? null : _elegirFacultad,
-              validator: (v) => v == null ? 'Selecciona tu facultad' : null,
+              validator: (v) =>
+                  ValidatorForm.validateSelection(v, 'Selecciona tu facultad'),
             ),
             const SizedBox(height: 16),
             const _FieldLabel(label: 'Programa'),
@@ -262,7 +280,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onChanged: _loading || _facultadId == null
                       ? null
                       : (v) => setState(() => _programaId = v),
-                  validator: (v) => v == null ? 'Selecciona tu programa' : null,
+                  validator: (v) => ValidatorForm.validateSelection(
+                    v,
+                    'Selecciona tu programa',
+                  ),
                 );
               },
             ),
@@ -288,6 +309,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           child: Form(
             key: _formKey,
+            autovalidateMode: _autovalidar,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -474,13 +496,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hintText: 'Ej. Mateo Valencia Gómez',
                     prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Ingresa tu nombre completo';
-                    }
-
-                    return null;
-                  },
+                  validator: (value) => ValidatorForm.validateRequired(
+                    value,
+                    'Ingresa tu nombre completo',
+                  ),
                 ),
 
                 const SizedBox(height: 16),
@@ -493,24 +512,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  onChanged: _limpiarErrorRegistro,
                   autofillHints: const [AutofillHints.email],
+                  autocorrect: false,
+                  enableSuggestions: false,
                   decoration: const InputDecoration(
                     hintText: 'usuario@udla.edu.co',
                     prefixIcon: Icon(Icons.alternate_email_rounded, size: 20),
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Ingresa tu correo institucional';
-                    }
-
-                    final email = value.trim().toLowerCase();
-
-                    if (!email.endsWith('@udla.edu.co')) {
-                      return 'Utiliza tu correo institucional @udla.edu.co';
-                    }
-
-                    return null;
-                  },
+                  validator: ValidatorForm.validateEmailInstitucional,
                 ),
 
                 const SizedBox(height: 6),
@@ -570,25 +581,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Ingresa una contraseña';
-                    }
-
-                    if (value.length < 8) {
-                      return 'La contraseña debe tener mínimo 8 caracteres';
-                    }
-
-                    if (!RegExp(r'[A-Za-z]').hasMatch(value)) {
-                      return 'La contraseña debe contener letras';
-                    }
-
-                    if (!RegExp(r'[0-9]').hasMatch(value)) {
-                      return 'La contraseña debe contener números';
-                    }
-
-                    return null;
-                  },
+                  validator: ValidatorForm.validateNewPassword,
                 ),
 
                 const SizedBox(height: 8),
@@ -680,17 +673,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Confirma tu contraseña';
-                    }
-
-                    if (value != _passwordController.text) {
-                      return 'Las contraseñas no coinciden';
-                    }
-
-                    return null;
-                  },
+                  validator: (value) => ValidatorForm.validateConfirmPassword(
+                    value,
+                    _passwordController.text,
+                  ),
                 ),
 
                 const SizedBox(height: 20),
@@ -714,6 +700,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onTap: () {
                       setState(() {
                         _acceptTerms = !_acceptTerms;
+                        if (_acceptTerms) _faltanTerminos = false;
                       });
                     },
                     child: Row(
@@ -725,6 +712,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           onChanged: (value) {
                             setState(() {
                               _acceptTerms = value ?? false;
+                              if (_acceptTerms) _faltanTerminos = false;
                             });
                           },
                         ),
@@ -763,7 +751,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
 
+                if (_faltanTerminos)
+                  const ErrorDeCampo(
+                    texto:
+                        'Debes aceptar el tratamiento de datos y el '
+                        'reglamento académico.',
+                  ),
+
                 const SizedBox(height: 20),
+
+                // Error de Firebase sobre el botón
+                if (_errorRegistro != null) ...[
+                  MensajeError(texto: _errorRegistro!),
+                  const SizedBox(height: 12),
+                ],
 
                 // Continuar
                 SizedBox(

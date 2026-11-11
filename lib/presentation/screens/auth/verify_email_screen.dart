@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
+import '../../../core/utils/validator_form.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/mensaje_error.dart';
 
 /// Pantalla que se muestra después de crear la cuenta (o al intentar entrar
 /// sin haber verificado): envía un código de 6 dígitos al correo y lo pide.
@@ -43,6 +45,16 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   bool _enviando = false;
   bool _verificando = false;
 
+  // Error del código (incompleto, incorrecto, vencido); va bajo las casillas
+  // y se borra al escribir otra vez
+  String? _errorCodigo;
+
+  void _limpiarErrorCodigo() {
+    if (_errorCodigo != null && _codigoController.text.isNotEmpty) {
+      setState(() => _errorCodigo = null);
+    }
+  }
+
   Duration _restante(DateTime? hasta) {
     if (hasta == null) return Duration.zero;
     final d = hasta.difference(DateTime.now());
@@ -58,6 +70,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   @override
   void initState() {
     super.initState();
+    _codigoController.addListener(_limpiarErrorCodigo);
     // Un segundo basta para las dos cuentas regresivas
     _reloj = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -105,7 +118,19 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   Future<void> _confirmar() async {
     if (_verificando) return;
-    setState(() => _verificando = true);
+    final error = ValidatorForm.validateCodigo(
+      _codigoController.text,
+      largo: _largoCodigo,
+    );
+    if (error != null) {
+      setState(() => _errorCodigo = error);
+      _codigoFocus.requestFocus();
+      return;
+    }
+    setState(() {
+      _verificando = true;
+      _errorCodigo = null;
+    });
     try {
       await widget.verificarCodigo(_codigoController.text);
       if (!mounted) return;
@@ -127,12 +152,13 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     } on AuthError catch (e) {
       _codigoController.clear();
       _codigoFocus.requestFocus();
-      _mostrarMensaje(e.mensaje, error: true);
+      if (mounted) setState(() => _errorCodigo = e.mensaje);
     } catch (_) {
-      _mostrarMensaje(
-        'Ocurrió un error inesperado. Intenta de nuevo.',
-        error: true,
-      );
+      if (mounted) {
+        setState(
+          () => _errorCodigo = 'Ocurrió un error inesperado. Intenta de nuevo.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _verificando = false);
     }
@@ -387,9 +413,14 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
             controller: _codigoController,
             focusNode: _codigoFocus,
             largo: _largoCodigo,
+            conError: _errorCodigo != null,
             // Al escribir el último dígito se confirma solo
             onCompleto: _confirmar,
           ),
+          if (_errorCodigo != null) ...[
+            const SizedBox(height: 12),
+            MensajeError(texto: _errorCodigo!),
+          ],
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
@@ -462,12 +493,16 @@ class _CasillasCodigo extends StatelessWidget {
     required this.focusNode,
     required this.largo,
     required this.onCompleto,
+    this.conError = false,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final int largo;
   final VoidCallback onCompleto;
+
+  /// Bordes rojos cuando el código tiene un error
+  final bool conError;
 
   @override
   Widget build(BuildContext context) {
@@ -486,6 +521,7 @@ class _CasillasCodigo extends StatelessWidget {
                     Expanded(
                       child: _Casilla(
                         digito: i < texto.length ? texto[i] : null,
+                        conError: conError,
                         activa:
                             focusNode.hasFocus &&
                             (i == texto.length ||
@@ -529,10 +565,15 @@ class _CasillasCodigo extends StatelessWidget {
 }
 
 class _Casilla extends StatelessWidget {
-  const _Casilla({required this.digito, required this.activa});
+  const _Casilla({
+    required this.digito,
+    required this.activa,
+    this.conError = false,
+  });
 
   final String? digito;
   final bool activa;
+  final bool conError;
 
   @override
   Widget build(BuildContext context) {
@@ -543,7 +584,9 @@ class _Casilla extends StatelessWidget {
         color: activa ? Colors.white : AppColors.surfaceLow,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: activa ? AppColors.primaryDark : Colors.transparent,
+          color: conError
+              ? AppColors.error
+              : (activa ? AppColors.primaryDark : Colors.transparent),
           width: 2,
         ),
       ),

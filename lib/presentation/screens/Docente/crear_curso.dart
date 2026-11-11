@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 // Solo LatLng: latlong2 también define un Path que choca con el de Flutter
 import 'package:latlong2/latlong.dart' show LatLng;
 
+import '../../../core/utils/validator_form.dart';
 import '../../../domain/entities/bloque_horario.dart';
 import '../../../domain/entities/curso.dart';
 import '../../../domain/entities/estudiante_inscrito.dart';
@@ -12,6 +13,7 @@ import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/curso_usecases.dart';
 import '../../../domain/usecases/facultad_usecases.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/mensaje_error.dart';
 import 'facultades_docente.dart';
 import 'importar_estudiantes.dart';
 
@@ -101,6 +103,36 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
 
   bool _guardando = false;
 
+  // Tras el primer intento de guardar, los errores se muestran en cada
+  // campo y en cada tarjeta, y se borran al corregirlos
+  bool _intentoGuardar = false;
+
+  // Error al confirmar un horario (horas vacías o al revés)
+  String? _errorHorario;
+
+  // Error del GPS al fijar la ubicación
+  String? _errorUbicacion;
+
+  // Error al guardar (formulario incompleto o Firestore), sobre el botón
+  String? _errorGuardar;
+
+  String? get _errorPeriodo => _intentoGuardar && _periodo == null
+      ? 'Define el período del curso'
+      : null;
+
+  String? get _errorSesiones => _intentoGuardar && _sesiones.isEmpty
+      ? 'Agrega al menos un horario de clase'
+      : null;
+
+  String? get _errorSinUbicacion => _intentoGuardar && _latitud == null
+      ? 'Fija la ubicación del curso'
+      : null;
+
+  // Al cambiar cualquier dato se quita el aviso de sobre el botón
+  void _limpiarErrorGuardar() {
+    if (_errorGuardar != null) setState(() => _errorGuardar = null);
+  }
+
   // Casos de uso, armados con el repositorio que llega de afuera
   late final _crearCurso = CrearCurso(widget.cursoRepository);
   late final _obtenerMiUbicacion = ObtenerMiUbicacion(widget.cursoRepository);
@@ -132,12 +164,6 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
       '${t.hour.toString().padLeft(2, '0')}:'
       '${t.minute.toString().padLeft(2, '0')}';
 
-  void _mostrarError(String mensaje) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje), backgroundColor: AppColors.error),
-    );
-  }
-
   Future<void> _elegirPeriodo() async {
     final ahora = DateTime.now();
     final rango = await showDateRangePicker(
@@ -148,7 +174,9 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
       helpText: 'Rango de fechas',
       saveText: 'Guardar período',
     );
-    if (rango != null) setState(() => _periodo = rango);
+    if (rango == null) return;
+    setState(() => _periodo = rango);
+    _limpiarErrorGuardar();
   }
 
   Future<void> _elegirHora({required bool esDesde}) async {
@@ -159,7 +187,10 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
       helpText: esDesde ? 'Hora de inicio' : 'Hora de fin',
     );
     if (hora == null) return;
-    setState(() => esDesde ? _desde = hora : _hasta = hora);
+    setState(() {
+      esDesde ? _desde = hora : _hasta = hora;
+      _errorHorario = null;
+    });
   }
 
   void _reiniciarSesion() {
@@ -167,19 +198,24 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
       _diaNuevaSesion = 0;
       _desde = null;
       _hasta = null;
+      _errorHorario = null;
     });
   }
 
   void _confirmarSesion() {
+    String? error;
     if (_desde == null || _hasta == null) {
-      _mostrarError('Elige la hora de inicio y de fin.');
+      error = 'Elige la hora de inicio y de fin';
+    } else if (_minutos(_hasta!) <= _minutos(_desde!)) {
+      error = 'La hora de fin debe ser posterior a la de inicio';
+    }
+    if (error != null) {
+      setState(() => _errorHorario = error);
       return;
     }
-    if (_minutos(_hasta!) <= _minutos(_desde!)) {
-      _mostrarError('La hora de fin debe ser posterior a la de inicio.');
-      return;
-    }
+    _limpiarErrorGuardar();
     setState(() {
+      _errorHorario = null;
       _sesiones.add(
         _Sesion(dia: _diaNuevaSesion, desde: _desde!, hasta: _hasta!),
       );
@@ -190,7 +226,11 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
   }
 
   Future<void> _fijarUbicacion() async {
-    setState(() => _buscandoUbicacion = true);
+    setState(() {
+      _buscandoUbicacion = true;
+      _errorUbicacion = null;
+    });
+    _limpiarErrorGuardar();
     try {
       final ubicacion = await _obtenerMiUbicacion();
       if (!mounted) return;
@@ -204,10 +244,13 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
         _mapController.move(LatLng(ubicacion.latitud, ubicacion.longitud), 17);
       }
     } on CursoError catch (e) {
-      if (mounted) _mostrarError(e.mensaje);
+      if (mounted) setState(() => _errorUbicacion = e.mensaje);
     } catch (_) {
       if (mounted) {
-        _mostrarError('No se pudo obtener la ubicación. Intenta de nuevo.');
+        setState(
+          () => _errorUbicacion =
+              'No se pudo obtener la ubicación. Intenta de nuevo.',
+        );
       }
     } finally {
       if (mounted) setState(() => _buscandoUbicacion = false);
@@ -229,19 +272,18 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
   }
 
   Future<void> _guardarCurso() async {
+    setState(() {
+      _intentoGuardar = true;
+      _errorGuardar = null;
+    });
+    // Cada campo y tarjeta incompleta muestra su error en rojo
     final formularioValido = _formKey.currentState!.validate();
-    if (!formularioValido) return;
-
-    if (_periodo == null) {
-      _mostrarError('Define el período del curso.');
-      return;
-    }
-    if (_sesiones.isEmpty) {
-      _mostrarError('Agrega al menos un horario de clase.');
-      return;
-    }
-    if (_latitud == null || _longitud == null) {
-      _mostrarError('Fija la ubicación del curso.');
+    if (!formularioValido ||
+        _periodo == null ||
+        _sesiones.isEmpty ||
+        _latitud == null ||
+        _longitud == null) {
+      setState(() => _errorGuardar = 'Revisa los campos marcados en rojo.');
       return;
     }
 
@@ -275,7 +317,13 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
           .showSnackBar(const SnackBar(content: Text('Curso creado')));
       Navigator.pop(context, true);
     } on CursoError catch (e) {
-      if (mounted) _mostrarError(e.mensaje);
+      if (mounted) setState(() => _errorGuardar = e.mensaje);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _errorGuardar = 'No se pudo crear el curso. Intenta de nuevo.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -322,6 +370,10 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
       ),
       body: Form(
         key: _formKey,
+        autovalidateMode: _intentoGuardar
+            ? AutovalidateMode.onUserInteraction
+            : AutovalidateMode.disabled,
+        onChanged: _limpiarErrorGuardar,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
@@ -346,6 +398,10 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
             const SizedBox(height: 16),
             _buildEstudiantes(),
             const SizedBox(height: 24),
+            if (_errorGuardar != null) ...[
+              MensajeError(texto: _errorGuardar!),
+              const SizedBox(height: 12),
+            ],
             SizedBox(
               height: 48,
               child: FilledButton(
@@ -412,9 +468,8 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
           textCapitalization: TextCapitalization.sentences,
           style: const TextStyle(fontSize: 16),
           decoration: _decoracion('Nombre del curso', Icons.menu_book_outlined),
-          validator: (v) => (v == null || v.trim().isEmpty)
-              ? 'Escribe el nombre del curso'
-              : null,
+          validator: (v) =>
+              ValidatorForm.validateRequired(v, 'Escribe el nombre del curso'),
         ),
         _buildFacultad(),
         TextFormField(
@@ -434,7 +489,8 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
               DropdownMenuItem(value: g, child: Text('Grupo $g')),
           ],
           onChanged: (v) => setState(() => _grupo = v),
-          validator: (v) => v == null ? 'Selecciona el grupo' : null,
+          validator: (v) =>
+              ValidatorForm.validateSelection(v, 'Selecciona el grupo'),
         ),
       ],
     );
@@ -474,7 +530,8 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
                   DropdownMenuItem(value: nombre, child: Text(nombre)),
               ],
               onChanged: (v) => setState(() => _facultad = v),
-              validator: (v) => v == null ? 'Selecciona la facultad' : null,
+              validator: (v) =>
+                  ValidatorForm.validateSelection(v, 'Selecciona la facultad'),
             ),
             if (snapshot.hasError)
               const Padding(
@@ -536,6 +593,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
   Widget _buildDuracion() {
     return _Tarjeta(
       titulo: 'Duración de Clases',
+      error: _errorPeriodo,
       accion: TextButton.icon(
         onPressed: _elegirPeriodo,
         style: TextButton.styleFrom(
@@ -580,6 +638,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
     final n = _sesiones.length;
     return _Tarjeta(
       titulo: 'Horario de Clases',
+      error: _errorSesiones,
       accion: n == 0
           ? null
           : _Etiqueta(n == 1 ? '1 sesión agregada' : '$n sesiones agregadas'),
@@ -747,6 +806,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
               ),
             ],
           ),
+          if (_errorHorario != null) ErrorDeCampo(texto: _errorHorario!),
           const SizedBox(height: 12),
 
           FilledButton.icon(
@@ -864,6 +924,7 @@ class _CrearCursoScreenState extends State<CrearCursoScreen> {
 
     return _Tarjeta(
       titulo: 'Ubicación Geolocalizada',
+      error: _errorUbicacion ?? _errorSinUbicacion,
       etiqueta: 'Para validar asistencia',
       accion: const Icon(
         Icons.pin_drop_outlined,
@@ -1148,12 +1209,16 @@ class _Tarjeta extends StatelessWidget {
   final Widget? accion;
   final List<Widget> children;
 
+  /// Error de la tarjeta (ej. falta el período): borde y texto en rojo
+  final String? error;
+
   const _Tarjeta({
     required this.titulo,
     required this.children,
     this.etiqueta,
     this.etiquetaNeutra = false,
     this.accion,
+    this.error,
   });
 
   @override
@@ -1163,6 +1228,7 @@ class _Tarjeta extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
+        border: error == null ? null : Border.all(color: AppColors.error),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -1201,6 +1267,7 @@ class _Tarjeta extends StatelessWidget {
             ],
           ),
           for (final child in children) ...[const SizedBox(height: 8), child],
+          if (error != null) ErrorDeCampo(texto: error!),
         ],
       ),
     );

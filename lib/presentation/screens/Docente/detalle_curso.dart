@@ -8,7 +8,9 @@ import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/curso_usecases.dart';
 import '../../../domain/usecases/facultad_usecases.dart';
 import '../../../routes/app_routes.dart';
+import '../../../core/utils/validator_form.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/mensaje_error.dart';
 import 'recuperaciones_curso.dart';
 
 /// Gestionar clase: próximas sesiones del curso y estudiantes matriculados.
@@ -102,69 +104,21 @@ class _DetalleCursoScreenState extends State<DetalleCursoScreen> {
     if (inicio == true) _mostrar('Sesión de asistencia cerrada');
   }
 
+  // El diálogo valida los campos y muestra el error de Firestore adentro;
+  // solo se cierra cuando el estudiante quedó agregado
   Future<void> _mostrarAgregar() async {
-    final correo = TextEditingController();
-    final nombre = TextEditingController();
-    final codigo = TextEditingController();
-    try {
-      final agregar = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Agregar estudiante'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: correo,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Correo institucional',
-                  ),
-                ),
-                TextField(
-                  controller: nombre,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre completo',
-                  ),
-                ),
-                TextField(
-                  controller: codigo,
-                  decoration: const InputDecoration(
-                    labelText: 'Código (opcional)',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Agregar'),
-            ),
-          ],
+    final agregado = await showDialog<bool>(
+      context: context,
+      builder: (_) => _DialogoAgregarEstudiante(
+        agregar: ({required correo, required nombre, codigo}) => _agregar(
+          widget.grupoId,
+          correo: correo,
+          nombre: nombre,
+          codigo: codigo,
         ),
-      );
-      if (agregar != true || !mounted) return;
-
-      await _agregar(
-        widget.grupoId,
-        correo: correo.text,
-        nombre: nombre.text,
-        codigo: codigo.text,
-      );
-      _mostrar('Estudiante agregado');
-    } on CursoError catch (e) {
-      _mostrar(e.mensaje);
-    } finally {
-      correo.dispose();
-      nombre.dispose();
-      codigo.dispose();
-    }
+      ),
+    );
+    if (agregado == true) _mostrar('Estudiante agregado');
   }
 
   Future<void> _confirmarQuitar(EstudianteInscrito estudiante) async {
@@ -925,8 +879,11 @@ class _Buscador extends StatelessWidget {
       controller: controller,
       onChanged: onChanged,
       textInputAction: TextInputAction.search,
+      // Teclado con @ porque también se puede buscar por correo
+      keyboardType: TextInputType.emailAddress,
+      autocorrect: false,
       decoration: InputDecoration(
-        hintText: 'Buscar por nombre o código institucional...',
+        hintText: 'Buscar por nombre, código o correo...',
         hintStyle: const TextStyle(color: AppColors.outline, fontSize: 13),
         prefixIcon: const Icon(
           Icons.search,
@@ -1078,6 +1035,30 @@ class _FilaEstudiante extends StatelessWidget {
                         ),
                       ),
                     ],
+                  )
+                // Inscrito por correo pero aún sin cuenta en Ceiba: verá
+                // el curso cuando se registre con ese correo
+                else if (estudiante.uid == null)
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.hourglass_empty_rounded,
+                        size: 13,
+                        color: AppColors.outline,
+                      ),
+                      SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Aún no se ha registrado en Ceiba',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.outline,
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -1090,6 +1071,154 @@ class _FilaEstudiante extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Formulario para inscribir a un estudiante a mano. Los errores de cada
+/// campo salen debajo de él y el de Firestore (ej. ya inscrito) sobre los
+/// botones, sin cerrar el diálogo.
+class _DialogoAgregarEstudiante extends StatefulWidget {
+  const _DialogoAgregarEstudiante({required this.agregar});
+
+  final Future<void> Function({
+    required String correo,
+    required String nombre,
+    String? codigo,
+  })
+  agregar;
+
+  @override
+  State<_DialogoAgregarEstudiante> createState() =>
+      _DialogoAgregarEstudianteState();
+}
+
+class _DialogoAgregarEstudianteState extends State<_DialogoAgregarEstudiante> {
+  final _formKey = GlobalKey<FormState>();
+  final _correo = TextEditingController();
+  final _nombre = TextEditingController();
+  final _codigo = TextEditingController();
+
+  AutovalidateMode _autovalidar = AutovalidateMode.disabled;
+  bool _guardando = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _correo.dispose();
+    _nombre.dispose();
+    _codigo.dispose();
+    super.dispose();
+  }
+
+  Future<void> _agregar() async {
+    setState(() {
+      _autovalidar = AutovalidateMode.onUserInteraction;
+      _error = null;
+    });
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _guardando = true);
+    try {
+      await widget.agregar(
+        correo: _correo.text,
+        nombre: _nombre.text,
+        codigo: _codigo.text,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } on CursoError catch (e) {
+      if (mounted) setState(() => _error = e.mensaje);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error = 'No se pudo agregar el estudiante. Intenta de nuevo.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _guardando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Agregar estudiante'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          autovalidateMode: _autovalidar,
+          onChanged: () {
+            if (_error != null) setState(() => _error = null);
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'No necesita tener cuenta todavía: verá el curso cuando se '
+                'registre en Ceiba con este correo.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              TextFormField(
+                controller: _correo,
+                enabled: !_guardando,
+                keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Correo institucional',
+                  hintText: 'usuario@udla.edu.co',
+                ),
+                validator: ValidatorForm.validateEmailInstitucional,
+              ),
+              TextFormField(
+                controller: _nombre,
+                enabled: !_guardando,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: 'Nombre completo'),
+                validator: (v) => ValidatorForm.validateRequired(
+                  v,
+                  'Escribe el nombre del estudiante',
+                ),
+              ),
+              TextFormField(
+                controller: _codigo,
+                enabled: !_guardando,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _guardando ? null : _agregar(),
+                decoration: const InputDecoration(
+                  labelText: 'Código (opcional)',
+                ),
+                validator: ValidatorForm.validateCodigoEstudiante,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                MensajeError(texto: _error!),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _guardando ? null : () => Navigator.pop(context, false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _guardando ? null : _agregar,
+          child: _guardando
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Agregar'),
+        ),
+      ],
     );
   }
 }

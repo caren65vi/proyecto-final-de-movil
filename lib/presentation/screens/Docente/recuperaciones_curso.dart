@@ -5,6 +5,7 @@ import '../../../domain/entities/recuperacion.dart';
 import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/curso_usecases.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/mensaje_error.dart';
 
 const _diasLargos = [
   'Lunes',
@@ -339,6 +340,23 @@ class _DialogoRecuperacionState extends State<_DialogoRecuperacion> {
   bool _guardando = false;
   String? _error;
 
+  // Tras el primer intento, los campos vacíos se marcan en rojo
+  bool _intento = false;
+
+  String? get _errorFecha =>
+      _intento && _fecha == null ? 'Elige la fecha' : null;
+
+  String? get _errorHoras {
+    if (!_intento) return null;
+    if (_desde == null || _hasta == null) {
+      return 'Elige la hora de inicio y fin';
+    }
+    final inicio = _desde!.hour * 60 + _desde!.minute;
+    final fin = _hasta!.hour * 60 + _hasta!.minute;
+    if (fin <= inicio) return 'La hora de fin debe ser posterior al inicio';
+    return null;
+  }
+
   @override
   void dispose() {
     _motivo.dispose();
@@ -361,7 +379,12 @@ class _DialogoRecuperacionState extends State<_DialogoRecuperacion> {
       firstDate: desde,
       lastDate: hasta,
     );
-    if (elegida != null) setState(() => _fecha = elegida);
+    if (elegida != null) {
+      setState(() {
+        _fecha = elegida;
+        _error = null;
+      });
+    }
   }
 
   Future<void> _elegirHora({required bool esDesde}) async {
@@ -372,14 +395,19 @@ class _DialogoRecuperacionState extends State<_DialogoRecuperacion> {
           TimeOfDay(hour: esDesde ? 8 : 10, minute: 0),
     );
     if (elegida == null) return;
-    setState(() => esDesde ? _desde = elegida : _hasta = elegida);
+    setState(() {
+      esDesde ? _desde = elegida : _hasta = elegida;
+      _error = null;
+    });
   }
 
   Future<void> _guardar() async {
-    if (_fecha == null || _desde == null || _hasta == null) {
-      setState(() => _error = 'Elige la fecha y las horas');
-      return;
-    }
+    setState(() {
+      _intento = true;
+      _error = null;
+    });
+    // Fecha u horas faltantes: se marcan en rojo bajo cada campo
+    if (_errorFecha != null || _errorHoras != null) return;
     setState(() {
       _guardando = true;
       _error = null;
@@ -397,12 +425,13 @@ class _DialogoRecuperacionState extends State<_DialogoRecuperacion> {
       );
       if (mounted) Navigator.pop(context, true);
     } on CursoError catch (e) {
+      if (mounted) setState(() => _error = e.mensaje);
+    } catch (_) {
       if (mounted) {
-        setState(() {
-          _guardando = false;
-          _error = e.mensaje;
-        });
+        setState(() => _error = 'No se pudo programar. Intenta de nuevo.');
       }
+    } finally {
+      if (mounted) setState(() => _guardando = false);
     }
   }
 
@@ -410,6 +439,7 @@ class _DialogoRecuperacionState extends State<_DialogoRecuperacion> {
     required IconData icono,
     required String texto,
     required VoidCallback onTap,
+    bool conError = false,
   }) {
     return InkWell(
       onTap: _guardando ? null : onTap,
@@ -419,6 +449,9 @@ class _DialogoRecuperacionState extends State<_DialogoRecuperacion> {
         decoration: BoxDecoration(
           color: AppColors.surfaceLow,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: conError ? AppColors.error : Colors.transparent,
+          ),
         ),
         child: Row(
           children: [
@@ -444,7 +477,9 @@ class _DialogoRecuperacionState extends State<_DialogoRecuperacion> {
               icono: Icons.event,
               texto: _fecha == null ? 'Elegir fecha' : _fechaLarga(_fecha!),
               onTap: _elegirFecha,
+              conError: _errorFecha != null,
             ),
+            if (_errorFecha != null) ErrorDeCampo(texto: _errorFecha!),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -453,6 +488,7 @@ class _DialogoRecuperacionState extends State<_DialogoRecuperacion> {
                     icono: Icons.schedule,
                     texto: _desde == null ? 'Desde' : _hora12(_texto(_desde!)),
                     onTap: () => _elegirHora(esDesde: true),
+                    conError: _errorHoras != null,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -461,10 +497,12 @@ class _DialogoRecuperacionState extends State<_DialogoRecuperacion> {
                     icono: Icons.schedule,
                     texto: _hasta == null ? 'Hasta' : _hora12(_texto(_hasta!)),
                     onTap: () => _elegirHora(esDesde: false),
+                    conError: _errorHoras != null,
                   ),
                 ),
               ],
             ),
+            if (_errorHoras != null) ErrorDeCampo(texto: _errorHoras!),
             const SizedBox(height: 8),
             TextField(
               controller: _motivo,
@@ -475,11 +513,11 @@ class _DialogoRecuperacionState extends State<_DialogoRecuperacion> {
                 hintText: 'Motivo (opcional). Ej. Festivo del lunes',
               ),
             ),
-            if (_error != null)
-              Text(
-                _error!,
-                style: const TextStyle(color: AppColors.error, fontSize: 12),
-              ),
+            // Error de Firestore (ej. choca con una clase normal)
+            if (_error != null) ...[
+              const SizedBox(height: 4),
+              MensajeError(texto: _error!),
+            ],
           ],
         ),
       ),

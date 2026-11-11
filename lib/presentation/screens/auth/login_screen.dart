@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/validator_form.dart';
+
 import '../../../domain/repositories/auth_repository.dart';
 import '../../../domain/usecases/auth_usecases.dart';
 import '../../../routes/app_routes.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/mensaje_error.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.iniciarSesion});
@@ -24,6 +27,17 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _loading = false;
 
+  // Tras el primer intento, los errores se actualizan mientras escribe
+  AutovalidateMode _autovalidar = AutovalidateMode.disabled;
+
+  // Error que devuelve Firebase (ej. contraseña incorrecta); se muestra
+  // debajo de los campos y se borra al volver a escribir
+  String? _errorLogin;
+
+  void _limpiarErrorLogin(String _) {
+    if (_errorLogin != null) setState(() => _errorLogin = null);
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -32,6 +46,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
+    setState(() {
+      _autovalidar = AutovalidateMode.onUserInteraction;
+      _errorLogin = null;
+    });
+    // Correo inválido, contraseña corta, etc.: el error sale bajo el campo
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -54,22 +73,20 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } on CorreoNoVerificadoError catch (e) {
       // La contraseña es correcta pero falta verificar el correo con el código
-      _showError(e.mensaje);
+      _mostrarError(e.mensaje);
       _abrirVerificacion();
     } on AuthError catch (e) {
-      _showError(e.mensaje);
+      _mostrarError(e.mensaje);
     } catch (_) {
-      _showError('Ocurrió un error inesperado. Intenta de nuevo.');
+      _mostrarError('Ocurrió un error inesperado. Intenta de nuevo.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _showError(String message) {
+  void _mostrarError(String mensaje) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.error),
-    );
+    setState(() => _errorLogin = mensaje);
   }
 
   void _forgotPassword() {
@@ -246,6 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: Form(
                       key: _formKey,
+                      autovalidateMode: _autovalidar,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -258,21 +276,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             autofillHints: const [AutofillHints.email],
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            textInputAction: TextInputAction.next,
+                            onChanged: _limpiarErrorLogin,
                             decoration: const InputDecoration(
                               hintText: 'usuario@udla.edu.co',
                               prefixIcon: Icon(Icons.school_outlined, size: 20),
                             ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Ingresa tu correo institucional';
-                              }
-
-                              if (!value.contains('@')) {
-                                return 'Ingresa un correo válido';
-                              }
-
-                              return null;
-                            },
+                            validator: ValidatorForm.validateEmail,
                           ),
 
                           const SizedBox(height: 16),
@@ -286,6 +298,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             autofillHints: const [AutofillHints.password],
+                            textInputAction: TextInputAction.done,
+                            onChanged: _limpiarErrorLogin,
+                            onFieldSubmitted: (_) => _loading ? null : _login(),
                             decoration: InputDecoration(
                               hintText: '••••••••••••',
                               prefixIcon: const Icon(
@@ -309,13 +324,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Ingresa tu contraseña';
-                              }
-
-                              return null;
-                            },
+                            validator: ValidatorForm.validatePassword,
                           ),
 
                           const SizedBox(height: 4),
@@ -335,7 +344,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 8),
+                          // Error de Firebase debajo de los campos
+                          if (_errorLogin != null) ...[
+                            MensajeError(texto: _errorLogin!),
+                            const SizedBox(height: 12),
+                          ] else
+                            const SizedBox(height: 8),
 
                           SizedBox(
                             height: 52,

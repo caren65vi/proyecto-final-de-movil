@@ -3,12 +3,14 @@ import 'package:flutter_map/flutter_map.dart';
 // Solo LatLng: latlong2 también define un Path que choca con el de Flutter
 import 'package:latlong2/latlong.dart' show LatLng;
 
+import '../../../core/utils/validator_form.dart';
 import '../../../domain/entities/bloque_horario.dart';
 import '../../../domain/entities/curso.dart';
 import '../../../domain/entities/estudiante_inscrito.dart';
 import '../../../domain/repositories/curso_repository.dart';
 import '../../../domain/usecases/curso_usecases.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/mensaje_error.dart';
 import 'importar_estudiantes.dart';
 
 /// Configuración del curso: datos generales, período, horarios y nómina.
@@ -87,6 +89,30 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
 
   bool _guardando = false;
 
+  // Tras el primer intento de guardar, los errores se muestran en cada
+  // campo y tarjeta, y se borran al corregirlos
+  bool _intentoGuardar = false;
+
+  // Error del GPS al buscar la ubicación
+  String? _errorUbicacion;
+
+  // Error al guardar (formulario incompleto o Firestore), sobre el botón
+  String? _errorGuardar;
+
+  String? get _errorSinUbicacion =>
+      _intentoGuardar && (_latitud == null || _longitud == null)
+      ? 'Fija la ubicación del curso para validar la asistencia'
+      : null;
+
+  String? get _errorSinHorario => _intentoGuardar && _horario.isEmpty
+      ? 'Agrega al menos un horario de clase'
+      : null;
+
+  // Al cambiar cualquier dato se quita el aviso de sobre el botón
+  void _limpiarErrorGuardar() {
+    if (_errorGuardar != null) setState(() => _errorGuardar = null);
+  }
+
   @override
   void dispose() {
     _nombre.dispose();
@@ -97,7 +123,11 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
 
   // Toma la ubicación del GPS del celular y centra el mapa en ella
   Future<void> _usarMiUbicacion() async {
-    setState(() => _buscandoUbicacion = true);
+    setState(() {
+      _buscandoUbicacion = true;
+      _errorUbicacion = null;
+    });
+    _limpiarErrorGuardar();
     try {
       final ubicacion = await widget.obtenerMiUbicacion();
       if (!mounted) return;
@@ -111,12 +141,14 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
         _mapController.move(LatLng(ubicacion.latitud, ubicacion.longitud), 17);
       }
     } on CursoError catch (e) {
-      _mostrar(e.mensaje, error: true);
+      if (mounted) setState(() => _errorUbicacion = e.mensaje);
     } catch (_) {
-      _mostrar(
-        'No se pudo obtener la ubicación. Intenta de nuevo.',
-        error: true,
-      );
+      if (mounted) {
+        setState(
+          () => _errorUbicacion =
+              'No se pudo obtener la ubicación. Intenta de nuevo.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _buscandoUbicacion = false);
     }
@@ -174,6 +206,7 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
       saveText: 'Guardar período',
     );
     if (rango == null) return;
+    _errorGuardar = null;
     setState(() {
       _inicio = rango.start;
       _fin = rango.end;
@@ -190,6 +223,7 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
       ),
     );
     if (bloque == null) return;
+    _errorGuardar = null;
     setState(() {
       if (indice == null) {
         _horario.add(bloque);
@@ -226,12 +260,17 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
   });
 
   Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_latitud == null || _longitud == null) {
-      _mostrar(
-        'Fija la ubicación del curso para validar la asistencia',
-        error: true,
-      );
+    setState(() {
+      _intentoGuardar = true;
+      _errorGuardar = null;
+    });
+    // Cada campo y tarjeta incompleta muestra su error en rojo
+    final formularioValido = _formKey.currentState!.validate();
+    if (!formularioValido ||
+        _horario.isEmpty ||
+        _latitud == null ||
+        _longitud == null) {
+      setState(() => _errorGuardar = 'Revisa los campos marcados en rojo.');
       return;
     }
 
@@ -284,7 +323,14 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
       );
       Navigator.pop(context);
     } on CursoError catch (e) {
-      _mostrar(e.mensaje, error: true);
+      if (mounted) setState(() => _errorGuardar = e.mensaje);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _errorGuardar =
+              'No se pudieron guardar los cambios. Intenta de nuevo.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -326,6 +372,10 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
       ),
       body: Form(
         key: _formKey,
+        autovalidateMode: _intentoGuardar
+            ? AutovalidateMode.onUserInteraction
+            : AutovalidateMode.disabled,
+        onChanged: _limpiarErrorGuardar,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
@@ -341,6 +391,10 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
             const SizedBox(height: 16),
             _buildNomina(),
             const SizedBox(height: 24),
+            if (_errorGuardar != null) ...[
+              MensajeError(texto: _errorGuardar!),
+              const SizedBox(height: 12),
+            ],
             SizedBox(
               height: 52,
               child: FilledButton.icon(
@@ -402,6 +456,7 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
     return _Tarjeta(
       icono: Icons.pin_drop_outlined,
       titulo: 'Ubicación',
+      error: _errorUbicacion ?? _errorSinUbicacion,
       accion: TextButton.icon(
         onPressed: _buscandoUbicacion ? null : _usarMiUbicacion,
         style: TextButton.styleFrom(
@@ -502,6 +557,7 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
         ),
         // Tocar el mapa mueve el punto del curso
         onTap: (_, punto) => setState(() {
+          _errorGuardar = null;
           _latitud = punto.latitude;
           _longitud = punto.longitude;
         }),
@@ -636,9 +692,10 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
           controller: _nombre,
           textCapitalization: TextCapitalization.sentences,
           decoration: _decoracion(Icons.school_outlined),
-          validator: (v) => (v == null || v.trim().isEmpty)
-              ? 'Escribe el nombre de la asignatura'
-              : null,
+          validator: (v) => ValidatorForm.validateRequired(
+            v,
+            'Escribe el nombre de la asignatura',
+          ),
         ),
         const SizedBox(height: 14),
         Row(
@@ -662,7 +719,8 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
                         DropdownMenuItem(value: g, child: Text('Grupo $g')),
                     ],
                     onChanged: (v) => setState(() => _grupo = v ?? _grupo),
-                    validator: (v) => v == null ? 'Elige el grupo' : null,
+                    validator: (v) =>
+                        ValidatorForm.validateSelection(v, 'Elige el grupo'),
                   ),
                 ],
               ),
@@ -781,6 +839,7 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
     return _Tarjeta(
       icono: Icons.edit_calendar_outlined,
       titulo: 'Horarios de Sesión',
+      error: _errorSinHorario,
       accion: Text(
         n == 1 ? '1 sesión/sem' : '$n sesiones/sem',
         style: const TextStyle(
@@ -1013,12 +1072,16 @@ class _Tarjeta extends StatelessWidget {
     required this.titulo,
     required this.children,
     this.accion,
+    this.error,
   });
 
   final IconData icono;
   final String titulo;
   final Widget? accion;
   final List<Widget> children;
+
+  /// Error de la tarjeta (ej. falta la ubicación): borde y texto en rojo
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
@@ -1027,6 +1090,7 @@ class _Tarjeta extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
+        border: error == null ? null : Border.all(color: AppColors.error),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -1057,6 +1121,7 @@ class _Tarjeta extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           ...children,
+          if (error != null) ErrorDeCampo(texto: error!),
         ],
       ),
     );
